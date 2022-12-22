@@ -73,6 +73,17 @@ def parse_num_proc(num_proc):
     else:
         raise ValueError("num_proc ({}) is of invalid type".format(num_proc))
 
+# def hash_hex_to_path(hash_hex):
+#
+# if self.fname_style_version == 1:
+#     n1, n2, n = key[:6], key[6:12], key[12:]
+#     fname_path = self.cache_dir / n1 / n2
+#     fname = fname_path / n
+# elif self.fname_style_version == 2:
+#     n1, n2, n3, n = key[0:2], key[2:4], key[4:6], key[6:]
+#     fname_path = self.cache_dir / n1 / n2 / n3
+#     fname = fname_path / n
+
 
 class ErroneousFunctionCall:
     """
@@ -118,6 +129,8 @@ class MultiProcFunction:
         """
         self.n = parse_num_proc(num_proc)
         self.fnc = function
+        self.fnc_name = function.__name__
+        self.fnc_module = function.__module__
         self.sig = inspect.signature(function)
         self._start()
 
@@ -142,6 +155,7 @@ class MultiProcFunction:
             )
             p.start()
             self.procs.append(p)
+
 
     def __call__(self, *args, **kwargs):
         ba = self.sig.bind(*args, **kwargs)
