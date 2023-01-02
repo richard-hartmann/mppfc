@@ -16,14 +16,14 @@ tests_no_zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "c
 
 [[package]]
 name = "binfootprint"
-version = "1.0.0"
+version = "1.1.0"
 description = "unique serialization of python objetcs"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 
 [package.dependencies]
-numpy = ">=1.24.0,<2.0.0"
+numpy = ">=1.24.1,<2.0.0"
 pytest = ">=7.0.0,<8.0.0"
 
 [[package]]
@@ -62,7 +62,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "exceptiongroup"
-version = "1.0.4"
+version = "1.1.0"
 description = "Backport of PEP 654 (exception groups)"
 category = "main"
 optional = false
@@ -131,7 +131,7 @@ setuptools_scm = ">=7"
 
 [[package]]
 name = "numpy"
-version = "1.24.0"
+version = "1.24.1"
 description = "Fundamental package for array computing in Python"
 category = "main"
 optional = false
@@ -147,14 +147,14 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "pillow"
-version = "9.3.0"
+version = "9.4.0"
 description = "Python Imaging Library (Fork)"
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 
 [package.extras]
-docs = ["furo", "olefile", "sphinx (>=2.4)", "sphinx-copybutton", "sphinx-issues (>=3.0.1)", "sphinx-removed-in", "sphinxext-opengraph"]
+docs = ["furo", "olefile", "sphinx (>=2.4)", "sphinx-copybutton", "sphinx-inline-tabs", "sphinx-issues (>=3.0.1)", "sphinx-removed-in", "sphinxext-opengraph"]
 tests = ["check-manifest", "coverage", "defusedxml", "markdown2", "olefile", "packaging", "pyroma", "pytest", "pytest-cov", "pytest-timeout"]
 
 [[package]]
