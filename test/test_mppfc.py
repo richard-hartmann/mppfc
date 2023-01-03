@@ -192,22 +192,34 @@ def test_multi_proc_dec():
 
     t0 = time.perf_counter_ns()
     for sleep_in_sec in [1, 1.1, 1.2, 1.3]:
-        some_function(x=sleep_in_sec)
+        print("add {}".format(sleep_in_sec))
+        r = some_function(x=sleep_in_sec)
+        assert r is None
     t1 = time.perf_counter_ns()
+    time_to_add = (t1-t0)/10**9
+    print("all added {:.3e}s".format(time_to_add))
+    t0 = time.perf_counter_ns()
+    time.sleep(1.5)
+    some_function.status()
+    print("wait to finish ...")
     some_function.wait()
-    t3 = time.perf_counter_ns()
+    t1 = time.perf_counter_ns()
+    time_wait = (t1 - t0) / 10**9
+    print("all done {:.3e}s".format(time_wait))
+    some_function.status()
 
+    assert time_to_add < 0.1
+    assert time_wait < 3
 
-
-
-
-
-    #some_function.join()
-    #print(some_function.result_dict)
-
-
-
-
+    # load from cache
+    t0 = time.perf_counter_ns()
+    for sleep_in_sec in [1, 1.1, 1.2, 1.3]:
+        r = some_function(x=sleep_in_sec)
+        assert r is not None
+    t1 = time.perf_counter_ns()
+    time_to_load_from_cache = (t1 - t0) / 10**9
+    print("all loaded from cache {:.3e}s".format(time_to_load_from_cache))
+    assert time_to_load_from_cache < 1
 
 
 if __name__ == "__main__":

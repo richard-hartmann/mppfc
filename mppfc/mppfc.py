@@ -88,10 +88,22 @@ class ErroneousFunctionCall:
 
 class MultiProcCachedFunctionDec:
     """
-    Makes function evaluation on multiple cores available as decorator.
-    The aim is to provide a simple drop-in mechanism for parallelization.
+    The MultiProcCachedFunctionDec class works as function decorator for caching and parallel evaluation.
+
+    Calling an instance of MultiProcCachedFunctionDec with an arbitrary functions as arguments
+    returns an instance of MultiProcCachedFunction which uses
+        - CacheFileBased from the cache module for caching
+        - and provides a nearly drop-in mechanism to realize parallel evaluation.
+
+    Example
+    -------
     """
     def __init__(self, path='.cache', include_module_name=True):
+        """
+
+        The init of the decorator class allows to specify 'path' and 'include_module_name' which are
+        passed to the
+        """
         self.path = path
         self.include_module_name = include_module_name
 
@@ -127,7 +139,7 @@ class MultiProcCachedFunction:
         self._mp = False
 
         # contains the args to be evaluated and their hash value
-        self.kwargs_q = mp.Queue()
+        self.kwargs_q = mp.JoinableQueue()
         # the manager provides a shared list (proxied list)
         self.m = mp.Manager()
         # any arg that has been put to the Queue, is also added to that dict, so we can keep track of what has
@@ -211,7 +223,7 @@ class MultiProcCachedFunction:
         while not stop_event.is_set():
             # wait until an item is available
             try:
-                kwargs, arg_hash = kwargs_q.get(block=True, timeout=1)
+                kwargs, arg_hash = kwargs_q.get(block=True, timeout=0.3)
             except queue.Empty:
                 continue
 
@@ -224,6 +236,8 @@ class MultiProcCachedFunction:
                 del kwargs_for_progress[arg_hash]
             except Exception as e:
                 kwargs_for_progress[arg_hash] = ErroneousFunctionCall(e)
+            finally:
+                kwargs_q.task_done()
 
     def wait(self):
         """
@@ -287,14 +301,18 @@ class MultiProcCachedFunction:
     def status(self, return_str=False):
         remaining = len(self.kwargs_for_progress)
         finished = self.kwargs_cnt - remaining
-        avrg_CPU_time = self.total_CPU_time.value / finished
-        time_to_go = avrg_CPU_time * remaining / self.num_proc
-        hour = time_to_go // 3600
-        min = (time_to_go - 3600*hour) // 60
-        sec = int(time_to_go - 3600*hour - 60*min)
-        s = ""
-        s += "tasks remaining: {}, finished: {}, total :{}\n".format(remaining, finished, self.kwargs_cnt)
-        s += "avrg. CPU time per task: {:.3e}s, est. remaining time: {}:{}:{}".format(avrg_CPU_time, hour, min, sec)
+        s = "tasks remaining: {}, finished: {}, total :{}\n".format(remaining, finished, self.kwargs_cnt)
+        if finished > 0:
+            avrg_CPU_time = self.total_CPU_time.value / finished
+            time_to_go = avrg_CPU_time * remaining / self.num_proc
+            hour = int(time_to_go // 3600)
+            mnt = int((time_to_go - 3600*hour) // 60)
+            sec = int(time_to_go - 3600*hour - 60*mnt)
+            s += "avrg. CPU time per task: {:.3e}s, est. remaining time: {}h:{}m:{}s".format(
+                avrg_CPU_time, hour, mnt, sec
+            )
+        else:
+            s += "avrg. CPU time per task: ?, est. remaining time: ?"
 
         if return_str:
             return s
