@@ -1,4 +1,5 @@
 import pickle
+import time
 
 import mppfc
 import multiprocessing as mp
@@ -152,26 +153,65 @@ def test_cache():
     else:
         assert False, "KeyError should have been raised"
 
+    r = fnc(p, a=1.234, _cache_flag="no_cache")
+    fnc.set_result(p, a=1.234, _cache_result=r)
+    assert fnc(p, a=1.234, _cache_flag="has_key")
+    r2 = fnc(p, a=1.234, _cache_flag="cache_only")
+    assert r[0] == r2[0]
+    assert r[1] == r2[1]
+
+    try:
+        fnc.set_result(p, a=1.234, _cache_result=None)
+    except ValueError:
+        pass
+    else:
+        assert False, "ValueError should have been raised"
+
+
+@mppfc.MultiProcCachedFunctionDec()
+def some_function(x, a='y'):
+    time.sleep(x)
+    return 42*x, a
+
+
+def test_multi_proc_dec():
+    shutil.rmtree(some_function.cached_fnc.cache_dir)
+
+    sleep_in_sec = 0.1
+    r_no_cache = some_function(x=sleep_in_sec, _cache_flag='no_cache')
+    r_with_caching = some_function(x=sleep_in_sec)
+    r_from_cache = some_function(x=sleep_in_sec, _cache_flag='cache_only')
+
+    assert r_no_cache[0] == r_with_caching[0]
+    assert r_no_cache[1] == r_with_caching[1]
+
+    assert r_no_cache[0] == r_from_cache[0]
+    assert r_no_cache[1] == r_from_cache[1]
+
+    some_function.start_mp(num_proc=2)
+
+    t0 = time.perf_counter_ns()
+    for sleep_in_sec in [1, 1.1, 1.2, 1.3]:
+        some_function(x=sleep_in_sec)
+    t1 = time.perf_counter_ns()
+    some_function.wait()
+    t3 = time.perf_counter_ns()
 
 
 
 
-# @mpdec.MultiProcDec(num_proc=2)
-# def some_function(x, a='y'):
-#     return 42
-#
-#
-# def test_multi_proc_dec():
-#     some_function(x=None)
-#     some_function.join()
-#     print(some_function.result_dict)
-#
-#
-#
+
+
+    #some_function.join()
+    #print(some_function.result_dict)
+
+
+
 
 
 
 if __name__ == "__main__":
     # test_multi_proc_dec()
     # test_parse_num_proc()
-    test_hash_bytes_to_3_hex()
+    # test_hash_bytes_to_3_hex()
+    test_multi_proc_dec()

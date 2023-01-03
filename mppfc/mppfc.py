@@ -29,6 +29,9 @@ import multiprocessing as mp
 import queue
 import inspect
 import binfootprint as bf
+from .cache import CacheFileBased
+import time
+import warnings
 
 
 def parse_num_proc(num_proc):
@@ -73,17 +76,6 @@ def parse_num_proc(num_proc):
     else:
         raise ValueError("num_proc ({}) is of invalid type".format(num_proc))
 
-# def hash_hex_to_path(hash_hex):
-#
-# if self.fname_style_version == 1:
-#     n1, n2, n = key[:6], key[6:12], key[12:]
-#     fname_path = self.cache_dir / n1 / n2
-#     fname = fname_path / n
-# elif self.fname_style_version == 2:
-#     n1, n2, n3, n = key[0:2], key[2:4], key[4:6], key[6:]
-#     fname_path = self.cache_dir / n1 / n2 / n3
-#     fname = fname_path / n
-
 
 class ErroneousFunctionCall:
     """
@@ -94,81 +86,128 @@ class ErroneousFunctionCall:
         self.exc = exception
 
 
-class MultiProcDec:
+class MultiProcCachedFunctionDec:
     """
     Makes function evaluation on multiple cores available as decorator.
     The aim is to provide a simple drop-in mechanism for parallelization.
     """
-    def __init__(self, num_proc='all'):
-        self.num_proc = num_proc
+    def __init__(self, path='.cache', include_module_name=True):
+        self.path = path
+        self.include_module_name = include_module_name
 
     def __call__(self, function):
-        return MultiProcFunction(
+        return MultiProcCachedFunction(
             function=function,
-            num_proc=self.num_proc
+            path=self.path,
+            include_module_name=self.include_module_name
         )
 
 
-class MultiProcFunction:
+class MultiProcCachedFunction:
     """
-    Parallel function evaluation on multiple cores.
+    Parallel function evaluation on multiple cores and persistent caching of the results
 
     Exmaple:
     --------
     """
-    def __init__(self, function, num_proc='all'):
+    def __init__(self, function, path='.cache', include_module_name=True):
         """
-        setup parallelization for calls of 'function' using 'num_proc' client processes
+        The results of 'function' are cached using the CacheFileBased class.
+
+        When calling 'start_mp' python's multiprocessing is used to evaluate the function calls using
+        multiple subprocesses.
+        Note that this requires to call 'join' or 'terminate' at some point in order to allow the main process to exit.
 
         :param function: any function with *args and **kwargs
+        """
+        self.num_proc = 0
+        self.fnc = function
+        self.sig = inspect.signature(function)
+        self.cached_fnc = CacheFileBased(fnc=function, path=path, include_module_name=include_module_name)
+        self._mp = False
+
+        # contains the args to be evaluated and their hash value
+        self.kwargs_q = mp.Queue()
+        # the manager provides a shared list (proxied list)
+        self.m = mp.Manager()
+        # any arg that has been put to the Queue, is also added to that dict, so we can keep track of what has
+        # been put to the Queue. The values of the dict are
+        #     False: item is in Queue, but has not finished
+        #     instance of ErroneousFunctionCall: if the function call failed with some error.
+        # When an item has been processed successfully (crunched and cached to disk) it is removed from that dict.
+        self.kwargs_for_progress = self.m.dict()
+        self.kwargs_cnt = 0
+        self.total_CPU_time = mp.Value('d', 0.0)
+        self.stop_event = mp.Event()
+        self.procs = []
+
+    def start_mp(self, num_proc='all'):
+        """
+        Start the client processes. Return True on success.
+
+        Note that, if you use multiprocessing (you have called 'start_mp'), you need to join / terminate the
+        subprocesses (call 'join' or 'terminate') in order to allow the main process to exit.
+
+        If there are still some subprocesses running (from a previous call of start_mp) no
+        further processes will be spawned. In that case return False.
+
         :param num_proc: the number of client processes, can be
             a) positive int: explicit number of processes, must not exceed the number of available cores
             b) negative int or zero: number of available cores - abs(num_proc) (leaves abs(num_proc) cores unused
             c) float in the interval (0,1]: percentage of available cores.
             d) string 'all': as many clients processes as core available
         """
-        self.n = parse_num_proc(num_proc)
-        self.fnc = function
-        self.fnc_name = function.__name__
-        self.fnc_module = function.__module__
-        self.sig = inspect.signature(function)
-        self._start()
 
-    def _start(self):
-        """
-        Set up the shared data objects and start the client processes.
-        """
-        # contains the args to be evaluated and their hash value
-        self.kwargs_q = mp.Queue()
+        if len(self.procs) != 0:
+            warnings.warn("Cannot start multiprocessing! Some subprocesses are still running.")
+            return False
 
-        # the manager provides a shared list (proxied list)
-        self.m = mp.Manager()
-        # the collection of results, as dict with keys and values (arg_idx, result_for_idx)
-        self.result_dict = self.m.dict()
+        self._mp = True
+        self.num_proc = parse_num_proc(num_proc)
 
-        self.stop_event = mp.Event()
-        self.procs = []
-        for i in range(self.n):
+        self.stop_event.clear()
+        for i in range(self.num_proc):
             p = mp.Process(
                 target=self._runner,
-                args=(self.fnc, self.kwargs_q, self.result_dict, self.stop_event)
+                args=(self.cached_fnc, self.kwargs_q, self.kwargs_for_progress, self.stop_event, self.total_CPU_time)
             )
             p.start()
             self.procs.append(p)
-
+        return True
 
     def __call__(self, *args, **kwargs):
+        # fallback if multiprocessing has not been started yet
+        if self._mp is False:
+            return self.cached_fnc(*args, **kwargs)
+
+        # see if we can find the result in the cache
+        try:
+            return self.cached_fnc(*args, **kwargs, _cache_flag='cache_only')
+        except KeyError:
+            pass
+
         ba = self.sig.bind(*args, **kwargs)
         ba.apply_defaults()
         sorted_arguments = tuple(sorted(ba.arguments.items(), key=lambda item: item[0]))
         arg_hash = bf.hash_hex_from_object(sorted_arguments)
-        if arg_hash in self.result_dict:
-            return self.result_dict[arg_hash]
-        self.kwargs_q.put((ba.arguments, arg_hash))
+
+        # arg has already been put to the queue
+        if arg_hash in self.kwargs_for_progress:
+            # ... function call was erroneous
+            if isinstance(self.kwargs_for_progress[arg_hash], ErroneousFunctionCall):
+                self.terminate()
+                raise self.kwargs_for_progress[arg_hash]
+
+            return None
+        # arg has not been put to the queue
+        else:
+            self.kwargs_q.put((ba.arguments, arg_hash))
+            self.kwargs_cnt += 1
+            self.kwargs_for_progress[arg_hash] = False
         return None
 
     @staticmethod
-    def _runner(fnc, kwargs_q, result_dict, stop_event):
+    def _runner(cached_fnc, kwargs_q, kwargs_for_progress, stop_event, total_CPU_time):
         while not stop_event.is_set():
             # wait until an item is available
             try:
@@ -177,10 +216,23 @@ class MultiProcFunction:
                 continue
 
             try:
-                r = fnc(**kwargs)
+                t0 = time.perf_counter_ns()
+                cached_fnc(**kwargs)
+                t1 = time.perf_counter_ns()
+                with total_CPU_time.get_lock():
+                    total_CPU_time.value += (t1 - t0) / 10**9
+                del kwargs_for_progress[arg_hash]
             except Exception as e:
-                r = ErroneousFunctionCall(e)
-            result_dict[arg_hash] = r
+                kwargs_for_progress[arg_hash] = ErroneousFunctionCall(e)
+
+    def wait(self):
+        """
+        wait until all tasks have been processed
+        """
+        # continues when the Queue is empty
+        self.kwargs_q.join()
+        # continues when all subprocesses have finished
+        self.join()
 
     def join(self, timeout=None):
         """
@@ -196,6 +248,7 @@ class MultiProcFunction:
         :return: 'True' if all processes have finished
         """
         self.stop_event.set()
+        self._mp = False
         all_done = True
         for p in self.procs:
             p.join(timeout)
@@ -215,6 +268,7 @@ class MultiProcFunction:
         :return: 'True' if all processes have finished
         """
         self.stop_event.set()
+        self._mp = False
         for p in self.procs:
             p.terminate()
 
@@ -225,9 +279,27 @@ class MultiProcFunction:
         Trigger kill() on each client process.
         """
         self.stop_event.set()
+        self._mp = False
         for p in self.procs:
             p.kill()
         self.procs.clear()
+
+    def status(self, return_str=False):
+        remaining = len(self.kwargs_for_progress)
+        finished = self.kwargs_cnt - remaining
+        avrg_CPU_time = self.total_CPU_time.value / finished
+        time_to_go = avrg_CPU_time * remaining / self.num_proc
+        hour = time_to_go // 3600
+        min = (time_to_go - 3600*hour) // 60
+        sec = int(time_to_go - 3600*hour - 60*min)
+        s = ""
+        s += "tasks remaining: {}, finished: {}, total :{}\n".format(remaining, finished, self.kwargs_cnt)
+        s += "avrg. CPU time per task: {:.3e}s, est. remaining time: {}:{}:{}".format(avrg_CPU_time, hour, min, sec)
+
+        if return_str:
+            return s
+
+        print(s)
 
 
 

@@ -34,7 +34,7 @@ class CacheFileBasedDec:
 
 
 class CacheFileBased:
-    def __init__(self, fnc, path='.', include_module_name=True):
+    def __init__(self, fnc, path='.cache', include_module_name=True):
         """
         Extend the function `fnc` by caching and adds the extra kwarg `_cache_flag` which
         modifies the caching behavior as follows:
@@ -147,29 +147,24 @@ class CacheFileBased:
         except FileNotFoundError:
             return False
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, _cache_flag=None, **kwargs):
         """
         the actual wrapper function that implements the caching for `fnc`
         """
-        flag = None
-        if "_cache_flag" in kwargs:
-            flag = kwargs["_cache_flag"]
-            del kwargs["_cache_flag"]
-
-        if flag == "no_cache":
+        if _cache_flag == "no_cache":
             return self.fnc(*args, **kwargs)
         else:
             f_name = self.get_f_name(*args, **kwargs)
             item_exists = self.item_exists(f_name)
 
-            if flag == "has_key":
+            if _cache_flag == "has_key":
                 return item_exists
-            elif flag == "cache_only":
+            elif _cache_flag == "cache_only":
                 if not item_exists:
-                    raise KeyError("item not found in cache (file '{}' does not exist)".format(f_name))
+                    raise KeyError("Item not found in cache! (File '{}' does not exist.)".format(f_name))
                 with open(f_name, 'rb') as f:
                     return pickle.load(f)
-            elif (not item_exists) or (flag == "update"):
+            elif (not item_exists) or (_cache_flag == "update"):
                 r = self.fnc(*args, **kwargs)
                 f_name.parent.mkdir(parents=True, exist_ok=True)
                 with open(f_name, 'wb') as f:
@@ -178,3 +173,15 @@ class CacheFileBased:
             else:
                 with open(f_name, 'rb') as f:
                     return pickle.load(f)
+
+    def set_result(self, *args, _cache_result, _cache_overwrite=False, **kwargs):
+        f_name = self.get_f_name(*args, **kwargs)
+        item_exists = self.item_exists(f_name)
+        if item_exists and not _cache_overwrite:
+            raise ValueError(
+                "Result has already been cached! " +
+                "Set '_cache_overwrite' to True to force an update."
+            )
+        f_name.parent.mkdir(parents=True, exist_ok=True)
+        with open(f_name, 'wb') as f:
+            pickle.dump(_cache_result, f)
