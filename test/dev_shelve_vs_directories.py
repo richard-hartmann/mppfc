@@ -5,7 +5,7 @@ import time
 
 
 class SomeParam(bf.ABCParameter):
-    __slots__ = ['n', 'x']
+    __slots__ = ["n", "x"]
 
     def __init__(self, n, x):
         self.n, self.x = n, x
@@ -30,7 +30,7 @@ with shelve.open("some_param.shelve") as db:
         hash_hex = bf.hash_hex_from_object(p)
         db[hash_hex] = r
 t1 = time.perf_counter_ns()
-print("shelve (write, keep open) {:.4e}".format((t1-t0)*1e-9))
+print("shelve (write, keep open) {:.4e}".format((t1 - t0) * 1e-9))
 
 
 with shelve.open("some_param.shelve") as db:
@@ -45,7 +45,4 @@ for i in range(N):
         hash_hex = bf.hash_hex_from_object(p)
         db[hash_hex] = r
 t1 = time.perf_counter_ns()
-print("shelve (write, open single) {:.4e}".format((t1-t0)*1e-9))
-
-
-
+print("shelve (write, open single) {:.4e}".format((t1 - t0) * 1e-9))

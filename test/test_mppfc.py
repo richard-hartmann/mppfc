@@ -14,14 +14,16 @@ def test_parse_num_proc():
     n = mppfc.parse_num_proc(nc)
     assert n == nc
     try:
-        mppfc.parse_num_proc(nc+1)
+        mppfc.parse_num_proc(nc + 1)
     except ValueError:
         pass
     else:
-        assert False, "ValueError should have been raised if num_proc exceeds number of cores"
+        assert (
+            False
+        ), "ValueError should have been raised if num_proc exceeds number of cores"
 
     n = mppfc.parse_num_proc(-1)
-    assert n == nc-1
+    assert n == nc - 1
     n = mppfc.parse_num_proc(-3)
     assert n == nc - 3
     n = mppfc.parse_num_proc(0)
@@ -31,20 +33,24 @@ def test_parse_num_proc():
     except ValueError:
         pass
     else:
-        assert False, "ValueError should have been raised if num_proc <= - number of cores"
+        assert (
+            False
+        ), "ValueError should have been raised if num_proc <= - number of cores"
 
     try:
-        mppfc.parse_num_proc(-nc-1)
+        mppfc.parse_num_proc(-nc - 1)
     except ValueError:
         pass
     else:
-        assert False, "ValueError should have been raised if num_proc <= - number of cores"
+        assert (
+            False
+        ), "ValueError should have been raised if num_proc <= - number of cores"
 
     n = mppfc.parse_num_proc(0.5)
-    assert n == int(0.5*nc)
+    assert n == int(0.5 * nc)
 
     n = mppfc.parse_num_proc(0.9)
-    assert n == int(0.9*nc)
+    assert n == int(0.9 * nc)
 
     n = mppfc.parse_num_proc(1.0)
     assert n == nc
@@ -65,20 +71,20 @@ def test_parse_num_proc():
 
 
 def test_hash_bytes_to_3_hex():
-    b = bytes.fromhex('ffff ff ff ab')
+    b = bytes.fromhex("ffff ff ff ab")
     h = mppfc.CacheFileBased.hash_bytes_to_3_hex(b)
-    assert h[0] == '3fff'
-    assert h[1] == '3fff'
-    assert h[2] == 'fab'
+    assert h[0] == "3fff"
+    assert h[1] == "3fff"
+    assert h[2] == "fab"
 
-    b = bytes.fromhex('6312 11 22 33')
+    b = bytes.fromhex("6312 11 22 33")
     h = mppfc.CacheFileBased.hash_bytes_to_3_hex(b)
-    assert h[0] == '1111'
-    assert h[1] == '2222'
-    assert h[2] == '333'
+    assert h[0] == "1111"
+    assert h[1] == "2222"
+    assert h[2] == "333"
 
     random.seed(0)
-    two_bits = ['0', '1', '2', '3']
+    two_bits = ["0", "1", "2", "3"]
     for _ in range(10):
         s1 = random.choice(two_bits)
         s2 = random.choice(two_bits)
@@ -86,7 +92,7 @@ def test_hash_bytes_to_3_hex():
             s1 += random.choice(mppfc.cache.hex_alphabet)
             s2 += random.choice(mppfc.cache.hex_alphabet)
 
-        s3 = ''
+        s3 = ""
         for _ in range(7):
             s3 += random.choice(mppfc.cache.hex_alphabet)
 
@@ -138,7 +144,7 @@ def test_cache():
     assert fnc(p, a=2, _cache_flag="has_key") is True
 
     f_name = fnc.get_f_name(p, a=2)
-    with open(f_name, 'wb') as f:
+    with open(f_name, "wb") as f:
         pickle.dump(None, f)
 
     assert fnc(p, a=2) is None
@@ -169,18 +175,18 @@ def test_cache():
 
 
 @mppfc.MultiProcCachedFunctionDec()
-def some_function(x, a='y'):
+def some_function(x, a="y"):
     time.sleep(x)
-    return 42*x, a
+    return 42 * x, a
 
 
 def test_multi_proc_dec():
     shutil.rmtree(some_function.cached_fnc.cache_dir)
 
     sleep_in_sec = 0.1
-    r_no_cache = some_function(x=sleep_in_sec, _cache_flag='no_cache')
+    r_no_cache = some_function(x=sleep_in_sec, _cache_flag="no_cache")
     r_with_caching = some_function(x=sleep_in_sec)
-    r_from_cache = some_function(x=sleep_in_sec, _cache_flag='cache_only')
+    r_from_cache = some_function(x=sleep_in_sec, _cache_flag="cache_only")
 
     assert r_no_cache[0] == r_with_caching[0]
     assert r_no_cache[1] == r_with_caching[1]
@@ -196,7 +202,7 @@ def test_multi_proc_dec():
         r = some_function(x=sleep_in_sec)
         assert r is None
     t1 = time.perf_counter_ns()
-    time_to_add = (t1-t0)/10**9
+    time_to_add = (t1 - t0) / 10 ** 9
     print("all added {:.3e}s".format(time_to_add))
     t0 = time.perf_counter_ns()
     time.sleep(1.5)
@@ -204,7 +210,7 @@ def test_multi_proc_dec():
     print("wait to finish ...")
     some_function.wait()
     t1 = time.perf_counter_ns()
-    time_wait = (t1 - t0) / 10**9
+    time_wait = (t1 - t0) / 10 ** 9
     print("all done {:.3e}s".format(time_wait))
     some_function.status()
 
@@ -218,10 +224,9 @@ def test_multi_proc_dec():
         print(r)
         assert r is not None
     t1 = time.perf_counter_ns()
-    time_to_load_from_cache = (t1 - t0) / 10**9
+    time_to_load_from_cache = (t1 - t0) / 10 ** 9
     print("all loaded from cache {:.3e}s".format(time_to_load_from_cache))
     assert time_to_load_from_cache < 1
-
 
     # compare values
     for sleep_in_sec in [1, 1.1]:
@@ -272,10 +277,30 @@ def test_mppfc_stop():
     assert some_function.number_tasks_not_done == 4
 
 
+@mppfc.MultiProcCachedFunctionDec()
+def function_with_error(x):
+    time.sleep(x)
+    raise RuntimeError("something went wrong")
+
+
+def test_function_with_error():
+    function_with_error.start_mp(num_proc=2)
+    function_with_error(1)
+
+    time.sleep(2)
+    print(function_with_error(1))
+
+    function_with_error.wait()
+
+    function_with_error.status()
+
+    print(function_with_error(1))
+
 
 if __name__ == "__main__":
     # test_multi_proc_dec()
     # test_parse_num_proc()
     # test_hash_bytes_to_3_hex()
     # test_multi_proc_dec()
-    test_mppfc_stop()
+    # test_mppfc_stop()
+    test_function_with_error()

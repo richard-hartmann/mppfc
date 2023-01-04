@@ -5,7 +5,7 @@ import pathlib
 import pickle
 
 
-hex_alphabet = '0123456789abcdef'
+hex_alphabet = "0123456789abcdef"
 
 
 class CacheFileBasedDec:
@@ -34,7 +34,7 @@ class CacheFileBasedDec:
 
 
 class CacheFileBased:
-    def __init__(self, fnc, path='.cache', include_module_name=True):
+    def __init__(self, fnc, path=".cache", include_module_name=True):
         """
         Extend the function `fnc` by caching and adds the extra kwarg `_cache_flag` which
         modifies the caching behavior as follows:
@@ -67,7 +67,7 @@ class CacheFileBased:
         self.fnc = fnc
         self.fnc_sig = signature(fnc)
         if include_module_name:
-            self.cache_dir = self.path / (self.fnc.__module__ + '.' + self.fnc.__name__)
+            self.cache_dir = self.path / (self.fnc.__module__ + "." + self.fnc.__name__)
         else:
             self.cache_dir = self.path / self.fnc.__name__
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -109,26 +109,23 @@ class CacheFileBased:
         b = hash_bytes[0]
         b1 = (b & 0b11000000) >> 6
         b2 = (b & 0b00110000) >> 4
-        b3 = (b & 0b00001111)
+        b3 = b & 0b00001111
 
         c = hash_bytes[1]
         c1 = (c & 0b11110000) >> 4
-        c2 = (c & 0b00001111)
+        c2 = c & 0b00001111
 
         s1 = (
-                CacheFileBased.four_bit_int_to_hex(b1) +   # 2 bit
-                CacheFileBased.four_bit_int_to_hex(c1) +   # 4 bit
-                hash_bytes[2:3].hex()                        # 8 bit
+            CacheFileBased.four_bit_int_to_hex(b1)
+            + CacheFileBased.four_bit_int_to_hex(c1)  # 2 bit
+            + hash_bytes[2:3].hex()  # 4 bit  # 8 bit
         )
         s2 = (
-                CacheFileBased.four_bit_int_to_hex(b2) +  # 2 bit
-                CacheFileBased.four_bit_int_to_hex(c2) +  # 4 bit
-                hash_bytes[3:4].hex()  # 8 bit
+            CacheFileBased.four_bit_int_to_hex(b2)
+            + CacheFileBased.four_bit_int_to_hex(c2)  # 2 bit
+            + hash_bytes[3:4].hex()  # 4 bit  # 8 bit
         )
-        s3 = (
-                CacheFileBased.four_bit_int_to_hex(b3) +
-                hash_bytes[4:].hex()  # 8 bit
-        )
+        s3 = CacheFileBased.four_bit_int_to_hex(b3) + hash_bytes[4:].hex()  # 8 bit
 
         return s1, s2, s3
 
@@ -161,17 +158,21 @@ class CacheFileBased:
                 return item_exists
             elif _cache_flag == "cache_only":
                 if not item_exists:
-                    raise KeyError("Item not found in cache! (File '{}' does not exist.)".format(f_name))
-                with open(f_name, 'rb') as f:
+                    raise KeyError(
+                        "Item not found in cache! (File '{}' does not exist.)".format(
+                            f_name
+                        )
+                    )
+                with open(f_name, "rb") as f:
                     return pickle.load(f)
             elif (not item_exists) or (_cache_flag == "update"):
                 r = self.fnc(*args, **kwargs)
                 f_name.parent.mkdir(parents=True, exist_ok=True)
-                with open(f_name, 'wb') as f:
+                with open(f_name, "wb") as f:
                     pickle.dump(r, f)
                 return r
             else:
-                with open(f_name, 'rb') as f:
+                with open(f_name, "rb") as f:
                     return pickle.load(f)
 
     def set_result(self, *args, _cache_result, _cache_overwrite=False, **kwargs):
@@ -179,9 +180,9 @@ class CacheFileBased:
         item_exists = self.item_exists(f_name)
         if item_exists and not _cache_overwrite:
             raise ValueError(
-                "Result has already been cached! " +
-                "Set '_cache_overwrite' to True to force an update."
+                "Result has already been cached! "
+                + "Set '_cache_overwrite' to True to force an update."
             )
         f_name.parent.mkdir(parents=True, exist_ok=True)
-        with open(f_name, 'wb') as f:
+        with open(f_name, "wb") as f:
             pickle.dump(_cache_result, f)
