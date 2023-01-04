@@ -215,6 +215,7 @@ def test_multi_proc_dec():
     t0 = time.perf_counter_ns()
     for sleep_in_sec in [1, 1.1, 1.2, 1.3]:
         r = some_function(x=sleep_in_sec)
+        print(r)
         assert r is not None
     t1 = time.perf_counter_ns()
     time_to_load_from_cache = (t1 - t0) / 10**9
@@ -222,8 +223,59 @@ def test_multi_proc_dec():
     assert time_to_load_from_cache < 1
 
 
+    # compare values
+    for sleep_in_sec in [1, 1.1]:
+        r = some_function(x=sleep_in_sec)
+        r2 = some_function(x=sleep_in_sec, _cache_flag="no_cache")
+        assert r[0] == r2[0]
+        assert r[1] == r2[1]
+
+
+def test_mppfc_stop():
+    ####################
+    # test join
+    ####################
+    shutil.rmtree(some_function.cached_fnc.cache_dir)
+    some_function.start_mp(num_proc=2)
+    for sleep_in_sec in [3, 3.1, 3.2, 3.3]:
+        some_function(sleep_in_sec)
+    time.sleep(0.5)
+
+    # join signals the subprocess to not fetch a new argument, but allows
+    # to finish processing the current argument
+    r = some_function.join()
+    assert r is True
+    assert some_function.number_tasks_in_progress == 0
+    assert some_function.number_tasks_issued_in_total == 4
+    assert some_function.number_tasks_done == 2
+    assert some_function.number_tasks_waiting == 2
+    assert some_function.number_tasks_not_done == 2
+
+    ####################
+    # test terminate
+    ####################
+    shutil.rmtree(some_function.cached_fnc.cache_dir)
+    some_function.start_mp(num_proc=2)
+    for sleep_in_sec in [3, 3.1, 3.2, 3.3]:
+        some_function(sleep_in_sec)
+    time.sleep(0.5)
+
+    # terminate does interrupt the subprocess, so there is no
+    # communication back to the main process
+    # i.e., shared queue kwargs_q and dict kwargs_for_progress are not modified
+    r = some_function.terminate()
+    assert r is True
+    assert some_function.number_tasks_in_progress == 2
+    assert some_function.number_tasks_issued_in_total == 4
+    assert some_function.number_tasks_done == 0
+    assert some_function.number_tasks_waiting == 2
+    assert some_function.number_tasks_not_done == 4
+
+
+
 if __name__ == "__main__":
     # test_multi_proc_dec()
     # test_parse_num_proc()
     # test_hash_bytes_to_3_hex()
-    test_multi_proc_dec()
+    # test_multi_proc_dec()
+    test_mppfc_stop()
