@@ -33,8 +33,10 @@ import multiprocessing as mp
 import queue
 import threading
 import time
+import traceback
 from typing import Any, Callable, Union
 from pathlib import Path
+import sys
 import warnings
 
 # third party imports
@@ -88,14 +90,18 @@ def parse_num_proc(num_proc: Union[int, float, str]) -> int:
         raise ValueError("num_proc ({}) is of invalid type".format(num_proc))
 
 
-class ErroneousFunctionCall:
+class ErroneousFunctionCall(Exception):
     """
     This class is used as result if the function call failed.
     The member 'exc' holds the exception causing the failure.
     """
+    def __init__(self, ex: Exception, tb: str):
+        super().__init__()
+        self.ex = ex
+        self.tb = tb
 
-    def __init__(self, exception: Exception):
-        self.exc = exception
+    def __str__(self):
+        return "original Exception from subprocess ({}: {})\n{}".format(self.ex.__class__.__name__, self.ex, self.tb)
 
 
 class MultiProcCachedFunction:
@@ -186,17 +192,19 @@ class MultiProcCachedFunction:
         # the manager provides proxi access to python objects
         self.m = mp.Manager()
 
-        # any arg that has been put to the Queue, is also added to that dict, so we can keep track of what has
-        # been put to the Queue. The values of the dict are
-        #     False: item is in Queue, but has not finished
-        #     instance of ErroneousFunctionCall: if the function call failed with some error.
-        # When an item has been processed successfully (crunched and cached to disk) it is removed from that dict.
-        self.kwargs_for_progress = self.m.dict()
-
         # contains the args to be evaluated and their hash value
         self.kwargs_q = self.m.Queue()
 
-        self.total_CPU_time = self.m.Value("d", 0.0)
+        # Any arg that has been put to the Queue, ist hash is also added to that dict (should be a set), 
+        # so we can keep track of what has been put to the Queue. The values of the dict are irrelevant.
+        # When an item has been processed (successfully crunched and cached to disk or failed) it is removed from
+        # that dict.
+        self.kwargs_hash_set = self.m.dict()
+
+        # save exception and traceback, so it can be raised in the main process
+        self.erroneous_call_dict = self.m.dict()
+      
+        self.total_cpu_time = self.m.Value("d", 0.0)
         self.stop_event = self.m.Event()
 
         self.kwargs_cnt = 0
@@ -229,7 +237,7 @@ class MultiProcCachedFunction:
             Note that if processing an arguments raises an exception, this argument is marked as done, but it is not
             added to the cache.
         """
-        return len(self.kwargs_for_progress)
+        return len(self.kwargs_hash_set)
 
     @property
     def number_tasks_in_progress(self) -> int:
@@ -253,6 +261,14 @@ class MultiProcCachedFunction:
                 added to the cache.
         """
         return self.number_tasks_issued_in_total - self.number_tasks_not_done
+
+    @property
+    def number_tasks_failed(self) -> int:
+        """
+            Returns:
+                The number of tasks/arguments which have raised an exception while been processed.
+        """
+        return len(self.erroneous_call_dict)
 
     def start_mp(self, num_proc: Union[int, float, str] = "all") -> bool:
         """
@@ -282,7 +298,7 @@ class MultiProcCachedFunction:
         self._mp = True
         self.num_proc = parse_num_proc(num_proc)
         self.kwargs_cnt = self.kwargs_q.qsize()
-        self.total_CPU_time.value = 0
+        self.total_cpu_time.value = 0
 
         self.stop_event.clear()
         for i in range(self.num_proc):
@@ -291,9 +307,10 @@ class MultiProcCachedFunction:
                 args=(
                     self.cached_fnc,
                     self.kwargs_q,
-                    self.kwargs_for_progress,
+                    self.kwargs_hash_set,
+                    self.erroneous_call_dict,
                     self.stop_event,
-                    self.total_CPU_time,
+                    self.total_cpu_time,
                 ),
             )
             p.start()
@@ -329,6 +346,7 @@ class MultiProcCachedFunction:
                 "You cannot use the '_cache_flag' kwarg if in multiprocessing mode"
             )
 
+
         # see if we can find the result in the cache
         try:
             return self.cached_fnc(*args, **kwargs, _cache_flag="cache_only")
@@ -340,26 +358,26 @@ class MultiProcCachedFunction:
         sorted_arguments = tuple(sorted(ba.arguments.items(), key=lambda item: item[0]))
         arg_hash = bf.hash_hex_from_object(sorted_arguments)
 
-        # arg has already been put to the queue
-        if arg_hash in self.kwargs_for_progress:
-            # ... function call was erroneous
-            if isinstance(self.kwargs_for_progress[arg_hash], ErroneousFunctionCall):
-                self.terminate()
-                raise self.kwargs_for_progress[arg_hash]
+        if arg_hash in self.erroneous_call_dict:
+            ex, tb = self.erroneous_call_dict[arg_hash]
+            raise ErroneousFunctionCall(ex, tb)
 
+        # arg has already been put to the queue
+        if arg_hash in self.kwargs_hash_set:
             return None
         # arg has not been put to the queue
         else:
             self.kwargs_q.put((ba.arguments, arg_hash))
             self.kwargs_cnt += 1
-            self.kwargs_for_progress[arg_hash] = False
+            self.kwargs_hash_set[arg_hash] = False
         return None
 
     @staticmethod
     def _runner(
         cached_fnc: CacheFileBased,
         kwargs_q: queue,
-        kwargs_for_progress: dict,
+        kwargs_hash_set: dict,
+        erroneous_call_dict: dict,
         stop_event: threading.Event,
         total_cpu_time: mp.Value,
     ) -> None:
@@ -371,10 +389,11 @@ class MultiProcCachedFunction:
             kwargs_q:
                 Shared joinable queue from which to get the pair (kwargs, arg_hash).
                 Kwargs is passed to cached_fnc, arg_hash is used to uniquely identify the kwargs.
-            kwargs_for_progress:
+            kwargs_hash_set:
                 Shared dictionary to mark successfully processed arguments by deleting arg_hash.
-                In case calling cached_fnc raises an exception, this exception is set as value for the
-                key arg_hash.
+            erroneous_call_dict:
+                In case an error occurs while processing an argument, the exception and traceback are
+                stored as value in that dict with the argument hash as key.
             stop_event:
                 A shared Event which, when set, signals that no more arguments should be fetched from the queue.
             total_cpu_time:
@@ -392,13 +411,13 @@ class MultiProcCachedFunction:
                 cached_fnc(**kwargs)
                 t1 = time.perf_counter_ns()
                 total_cpu_time.value += (t1 - t0) / 10 ** 9
-                del kwargs_for_progress[arg_hash]
             except Exception as e:
-                kwargs_for_progress[arg_hash] = ErroneousFunctionCall(e)
+                erroneous_call_dict[arg_hash] = (e, traceback.format_exc())
             finally:
+                del kwargs_hash_set[arg_hash]
                 kwargs_q.task_done()
 
-    def wait(self, status_interval_in_sec: Union[float, None] = None) -> bool:
+    def wait(self, status_interval_in_sec: Union[float, None] = None) -> None:
         """
         Wait until all tasks have been processed.
         When `wait` returns, multiprocessing hase become inactive.
@@ -480,7 +499,7 @@ class MultiProcCachedFunction:
         """
         Print multiprocessing status information.
 
-        This includes information on the number of tasks (in progress, remaining, finished and total),
+        This includes information on the number of tasks (in progress, remaining, finished, failed and total),
         and on the time (average time per task, an estimate on the remaining time to process all tasks).
 
         Args:
@@ -491,22 +510,23 @@ class MultiProcCachedFunction:
         """
         l_tot = len(str(self.number_tasks_issued_in_total))
         l_num_proc = len(str(self.num_proc))
-        s = "TASKS in prog:{5:>{4}} rem:{1:>{0}}, fin:{2:>{0}}, tot:{3:} ".format(
+        s = "TASKS in prog:{5:>{4}} rem:{1:>{0}}, fin:{2:>{0}}, fai:{6:>{0}}, tot:{3:} ".format(
             l_tot,
             self.number_tasks_not_done,
             self.number_tasks_done,
             self.number_tasks_issued_in_total,
             l_num_proc,
             self.number_tasks_in_progress,
+            self.number_tasks_failed
         )
         if self.number_tasks_done > 0:
-            avrg_CPU_time = self.total_CPU_time.value / self.number_tasks_done
-            time_to_go = avrg_CPU_time * self.number_tasks_not_done / self.num_proc
+            avrg_cpu_time = self.total_cpu_time.value / self.number_tasks_done
+            time_to_go = avrg_cpu_time * self.number_tasks_not_done / self.num_proc
             hour = int(time_to_go // 3600)
             mnt = int((time_to_go - 3600 * hour) // 60)
             sec = int(time_to_go - 3600 * hour - 60 * mnt)
             s += "TIME avrg. per task: {:.2e}s, remaining: {}h:{:0>2}m:{:0>2}s".format(
-                avrg_CPU_time, hour, mnt, sec
+                avrg_cpu_time, hour, mnt, sec
             )
         else:
             s += "TIME ???"

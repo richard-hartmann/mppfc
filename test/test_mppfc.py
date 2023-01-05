@@ -288,13 +288,29 @@ def test_function_with_error():
     function_with_error(1)
 
     time.sleep(2)
-    print(function_with_error(1))
+    try:
+        function_with_error(1)
+    except mppfc.ErroneousFunctionCall:
+        pass
+    else:
+        assert False, "ErroneousFunctionCall should have been raised"
 
+    assert function_with_error.number_tasks_failed == 1
     function_with_error.wait()
 
-    function_with_error.status()
+    try:
+        function_with_error(1, _cache_flag="cache_only")
+    except KeyError:
+        pass
+    else:
+        assert False, "KeyError should have been raised"
 
-    print(function_with_error(1))
+    try:
+        function_with_error(1)
+    except RuntimeError:
+        pass
+    else:
+        assert False, "RuntimeError should have been raised"
 
 
 if __name__ == "__main__":
