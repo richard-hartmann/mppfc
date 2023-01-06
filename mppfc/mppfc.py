@@ -270,6 +270,16 @@ class MultiProcCachedFunction:
         """
         return len(self.erroneous_call_dict)
 
+    @property
+    def cache_dir(self) -> str:
+        """
+        directory which contains the cache data
+
+        If `include_module_name` is True, then `path / module_name.function_name`,
+        otherwise `path / function_name`.
+        """
+        return self.cached_fnc.cache_dir
+
     def start_mp(self, num_proc: Union[int, float, str] = "all") -> bool:
         """
         Spawns the client processes. Return True on success.
