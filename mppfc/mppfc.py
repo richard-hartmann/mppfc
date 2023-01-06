@@ -204,7 +204,7 @@ class MultiProcCachedFunction:
         # save exception and traceback, so it can be raised in the main process
         self.erroneous_call_dict = self.m.dict()
       
-        self.total_cpu_time = self.m.Value("d", 0.0)
+        self.total_cpu_time = mp.Value("d", 0.0)
         self.stop_event = self.m.Event()
 
         self.kwargs_cnt = 0
@@ -279,6 +279,26 @@ class MultiProcCachedFunction:
         otherwise `path / function_name`.
         """
         return self.cached_fnc.cache_dir
+
+    @property
+    def average_time_per_function_call(self) -> Union[None, float]:
+        """
+        Return the average time it took to evaluate the function.
+        If results are taken from cache, they are not included.
+        In case no items have been processed (function was never called), return None
+        """
+        if self.number_tasks_done == 0:
+            return None
+
+        return self.total_cpu_time.value / self.number_tasks_done
+
+    @property
+    def mp_enabled(self) -> bool:
+        """
+        Return True if multiprocessing is currently enabled (`start_mp` was called),
+        otherwise False (`wait`, `join`, `terminate` and `kill` stops multiprocessing)
+        """
+        return self._mp
 
     def start_mp(self, num_proc: Union[int, float, str] = "all") -> bool:
         """
@@ -416,15 +436,16 @@ class MultiProcCachedFunction:
             except queue.Empty:
                 continue
 
+            t0 = time.perf_counter_ns()
             try:
-                t0 = time.perf_counter_ns()
                 cached_fnc(**kwargs)
-                t1 = time.perf_counter_ns()
-                total_cpu_time.value += (t1 - t0) / 10 ** 9
             except Exception as e:
                 erroneous_call_dict[arg_hash] = (e, traceback.format_exc())
             finally:
                 del kwargs_hash_set[arg_hash]
+                t1 = time.perf_counter_ns()
+                with total_cpu_time.get_lock():
+                    total_cpu_time.value += (t1 - t0) / 10**9
                 kwargs_q.task_done()
 
     def wait(self, status_interval_in_sec: Union[float, None] = None) -> None:
@@ -520,7 +541,7 @@ class MultiProcCachedFunction:
         """
         l_tot = len(str(self.number_tasks_issued_in_total))
         l_num_proc = len(str(self.num_proc))
-        s = "TASKS in prog:{5:>{4}} rem:{1:>{0}}, fin:{2:>{0}}, fai:{6:>{0}}, tot:{3:} ".format(
+        s = "TASKS in prog:{5:>{4}} rem:{1:>{0}}, fin:{2:>{0}}, fail:{6:>{0}}, tot:{3:} ".format(
             l_tot,
             self.number_tasks_not_done,
             self.number_tasks_done,

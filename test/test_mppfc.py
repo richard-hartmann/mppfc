@@ -236,6 +236,23 @@ def test_multi_proc_dec():
         assert r[1] == r2[1]
 
 
+@mppfc.MultiProcCachedFunctionDec()
+def two_sec_fnc(x, dt):
+    time.sleep(dt)
+    return x
+
+
+def test_two_sec_fnc():
+    dt = 0.05
+    for N in [16, 17, 18, 19]:
+        shutil.rmtree(two_sec_fnc.cache_dir)
+        two_sec_fnc.start_mp(num_proc=4)
+        for x in range(N):
+            two_sec_fnc(x, dt)
+        two_sec_fnc.wait()
+        assert abs(two_sec_fnc.average_time_per_function_call - dt) < 0.005
+
+
 def test_mppfc_stop():
     ####################
     # test join
@@ -318,5 +335,7 @@ if __name__ == "__main__":
     # test_parse_num_proc()
     # test_hash_bytes_to_3_hex()
     # test_multi_proc_dec()
+    test_two_sec_fnc()
     # test_mppfc_stop()
-    test_function_with_error()
+    # test_function_with_error()
+

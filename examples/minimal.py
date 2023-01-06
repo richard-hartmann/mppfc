@@ -19,12 +19,3 @@ for x in [1, 2, 3, 5]:
     y = slow_function(x)
     print("x={}, y={}".format(x, y))
 slow_function.wait()
-
-# We start the multiprocessing mode with `start_mp()` and simply call our function
-# `slow_function` without caring about its results.
-# By calling `wait()`, we wait until all parameters have been processed and cached to disk.
-#
-
-# Now we can call `slow_function` as usual and use its return value.
-# Adding the `_cache_flag="cache_only"` parameter is not necessary.
-# However, it emphasizes that all results are taken from the cache.
