@@ -31,6 +31,7 @@ SOFTWARE.
 import inspect
 import multiprocessing as mp
 import queue
+import signal
 import threading
 import time
 import traceback
@@ -430,6 +431,10 @@ class MultiProcCachedFunction:
             total_cpu_time:
                 A shared float Value to accumulate the CPU time used to process the arguments.
         """
+        def sigterm_to_interrupted_error(*args):
+            raise InterruptedError("received SIGTERM")
+        signal.signal(signal.SIGTERM, sigterm_to_interrupted_error)
+
         while not stop_event.is_set():
             # wait until an item is available
             try:
@@ -483,9 +488,7 @@ class MultiProcCachedFunction:
         When `join` returns, multiprocessing hase become inactive.
 
         If timeout is 'None' this function will return `True` once all client processes have finished.
-        Otherwise, wait it
-
-        at most timeout seconds. If the clients have not finished within that
+        Otherwise, wait at most timeout seconds. If the clients have not finished within that
         time interval, return `False`.
 
         Args:
@@ -529,17 +532,6 @@ class MultiProcCachedFunction:
             p.terminate()
 
         return self.join(timeout)
-
-    def kill(self) -> None:
-        """
-        Trigger kill() on each client process.
-        When `kill` returns, multiprocessing hase become inactive.
-        """
-        self.stop_event.set()
-        self._mp = False
-        for p in self.procs:
-            p.kill()
-        self.procs.clear()
 
     def status(self, return_str: bool = False) -> Union[None, str]:
         """

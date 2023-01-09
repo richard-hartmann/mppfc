@@ -36,9 +36,9 @@ print("cache data will be at:", slow_function2.cache_dir)
 #       'cache_only': Raises a `KeyError` if the result has not been cached yet.
 x = 3
 y = slow_function2(x=x)
-print('slow_function(x={}) = {}'.formart(x, y))
+print('slow_function(x={}) = {}'.format(x, y))
 y = slow_function2(x=x, _cache_flag='has_key')
-print('x={} is in cache: {}'.formart(x, y))
+print('x={} is in cache: {}'.format(x, y))
 
 # now turn on multiprocessing
 # num_proc controls the number of client processes. This parameter can be
@@ -46,10 +46,73 @@ print('x={} is in cache: {}'.formart(x, y))
 #       b) negative int or zero: number of available cores - abs(num_proc) (leaves abs(num_proc) cores unused
 #       c) float in the interval (0,1]: percentage of available cores.
 #       d) string 'all': as many clients processes as core available
-slow_function.start_mp(num_proc=2)
+slow_function2.start_mp(num_proc=2)
 
-# with multiprocessing
-for x in [1, 2, 3, 5]:
-    y = slow_function(x)
-    print("x={}, y={}".format(x, y))
-slow_function.wait()
+# Simply calling the (decorated) function queue the arguments, if not already in the cache, and returns.
+# The subprocesses do the actual work and cache the results to disk.
+# Note that in multiprocessing mode the keyword argument `_cache_flag` must not be set.
+for x in range(1, 15):
+    slow_function2(x)
+
+# Wait for all tasks to finish.
+# Print status information on the progress every second.
+# Wait joins all subprocesses and, thus, disables the multiprocessing mode.
+slow_function2.wait(status_interval_in_sec=1)
+
+# Now the results are quickly accessible from cache.
+# The cache flag 'cache_only' is of course not necessary here and of educational purpose only.
+for x in [4, 10]:
+    y = slow_function2(x, _cache_flag='cache_only')
+    print('slow_function(x={}) = {} (from cache)'.format(x, y))
+
+# Start multiprocessing again
+slow_function2.start_mp(num_proc=2)
+# and submit more arguments to be crunched.
+for x in range(20, 200):
+    slow_function2(x)
+
+# Gracefully stop the calculation after 3 seconds with `join()`.
+# By calling `join(timeout)`, the subprocess are signaled to stop.
+# They are allowed to finsh the current task before they return.
+# That means they do not fetch a new argument.
+# `join` waits at most timeout second before it returns.
+# It returns True if **all** subprocesses have terminated, False otherwise.
+time.sleep(3.2)
+print("\ngracefully interrupt the calculation")
+while True:
+    print("join subprocesses, wait no more than 0.2 seconds.")
+    joined = slow_function2.join(timeout=0.2)
+    print("all processed joined: {}".format(joined))
+    if joined:
+        break
+# The status shows that some arguments have not been processed.
+slow_function2.status()
+# These details and some more are accessible by the following properties
+print("number_tasks_done", slow_function2.number_tasks_done)
+print("number_tasks_waiting", slow_function2.number_tasks_waiting)
+print("number_tasks_not_done", slow_function2.number_tasks_not_done)
+print("number_tasks_failed", slow_function2.number_tasks_failed)
+print("number_tasks_issued_in_total", slow_function2.number_tasks_issued_in_total)
+print("number_tasks_in_progress", slow_function2.number_tasks_in_progress)
+print("average_time_per_function_call", slow_function2.average_time_per_function_call)
+print("mp_enabled", slow_function2.mp_enabled)
+
+
+# resume, now with all but 2 subprocesses (note that this will fail if the system has 2 or less core only).
+slow_function2.start_mp(num_proc=-2)
+# Interrupt the subprocesses by calling `terminate`.
+# Behaves similar to `join` but sends a SIGTERM to the subprocesses, so the current call of the original function
+# is interrupted. This means that the argument will have been removed from the queue, it will also be marked as
+# done but no result is written to the cache.
+
+time.sleep(1.2)
+print("\ninterrupt the calculation with SIGTERM")
+while True:
+    print("terminate subprocesses, wait no more than 0.2 seconds.")
+    joined = slow_function2.terminate(timeout=0.2)
+    print("all processed joined: {}".format(joined))
+    if joined:
+        break
+# The status shows that some arguments have not been processed.
+slow_function2.status()
+
