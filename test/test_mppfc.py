@@ -330,12 +330,27 @@ def test_function_with_error():
         assert False, "RuntimeError should have been raised"
 
 
+def test_join():
+    dt = 1.4
+    shutil.rmtree(two_sec_fnc.cache_dir)
+    two_sec_fnc.start_mp(num_proc=4)
+    for x in range(100, 110):
+        two_sec_fnc(x, dt)
+
+    c = 0
+    while not two_sec_fnc.join(timeout=0.2):
+        c += 1
+
+    assert c == 7
+
+
 if __name__ == "__main__":
     # test_multi_proc_dec()
     # test_parse_num_proc()
     # test_hash_bytes_to_3_hex()
     # test_multi_proc_dec()
-    test_two_sec_fnc()
+    # test_two_sec_fnc()
     # test_mppfc_stop()
     # test_function_with_error()
+    test_join()
 

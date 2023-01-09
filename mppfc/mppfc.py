@@ -209,6 +209,7 @@ class MultiProcCachedFunction:
 
         self.kwargs_cnt = 0
         self.procs = []
+        self._all_done = False
 
     @property
     def number_tasks_waiting(self) -> int:
@@ -468,6 +469,11 @@ class MultiProcCachedFunction:
         # continues when all subprocesses have finished
         self.join()
 
+    def _is_alive(self, p, timeout):
+        p.join(timeout=timeout)
+        if p.is_alive():
+            self._all_done = False
+
     def join(self, timeout: Union[float, None] = None) -> bool:
         """
         Tell the client processes to **not** fetch a new argument (set stop_event).
@@ -475,25 +481,32 @@ class MultiProcCachedFunction:
         When `join` returns, multiprocessing hase become inactive.
 
         If timeout is 'None' this function will return `True` once all client processes have finished.
-        Otherwise, wait at most timeout seconds. If the clients have not finished within that
+        Otherwise, wait it
+
+        at most timeout seconds. If the clients have not finished within that
         time interval, return `False`.
 
         Args:
-            timeout: time in seconds for each process to join
+            timeout: time in seconds, gives each process timeout/num_proc seconds to join
 
         Returns:
             `True` if all processes have finished, `False` otherwise.
         """
         self.stop_event.set()
         self._mp = False
-        all_done = True
+        self._all_done = True
+        thread_list = []
         for p in self.procs:
-            p.join(timeout)
-            if p.exitcode is None:
-                all_done = False
-        if all_done:
+            t = threading.Thread(target=self._is_alive, args=(p, timeout))
+            t.start()
+            thread_list.append(t)
+
+        for is_alive_thread in thread_list:
+            is_alive_thread.join()
+
+        if self._all_done:
             self.procs.clear()
-        return all_done
+        return self._all_done
 
     def terminate(self, timeout: Union[float, None] = None) -> bool:
         """
