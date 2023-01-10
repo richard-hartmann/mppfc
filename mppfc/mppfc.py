@@ -440,6 +440,8 @@ class MultiProcCachedFunction:
             t0 = time.perf_counter_ns()
             try:
                 cached_fnc(**kwargs)
+            except InterruptedError:
+                pass
             except Exception as e:
                 erroneous_call_dict[arg_hash] = (e, traceback.format_exc())
             finally:

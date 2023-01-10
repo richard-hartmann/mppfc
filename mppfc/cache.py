@@ -1,3 +1,5 @@
+import os
+
 from binfootprint import dump
 import hashlib
 from inspect import signature
@@ -144,6 +146,25 @@ class CacheFileBased:
         except FileNotFoundError:
             return False
 
+    @staticmethod
+    def _write_item(f_name, item):
+        """
+        writes item to disk at location f_name
+
+        Removes partially written file on InterruptError.
+
+        Args:
+            f_name: filename where to dump the item
+            item: the python object to be dumped
+        """
+        f_name.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(f_name, "wb") as f:
+                pickle.dump(item, f)
+        except InterruptedError:
+            os.remove(f_name)
+            raise
+
     def __call__(self, *args, _cache_flag=None, **kwargs):
         """
         the actual wrapper function that implements the caching for `fnc`
@@ -167,9 +188,7 @@ class CacheFileBased:
                     return pickle.load(f)
             elif (not item_exists) or (_cache_flag == "update"):
                 r = self.fnc(*args, **kwargs)
-                f_name.parent.mkdir(parents=True, exist_ok=True)
-                with open(f_name, "wb") as f:
-                    pickle.dump(r, f)
+                self._write_item(f_name=f_name, item=r)
                 return r
             else:
                 with open(f_name, "rb") as f:
@@ -184,5 +203,4 @@ class CacheFileBased:
                 + "Set '_cache_overwrite' to True to force an update."
             )
         f_name.parent.mkdir(parents=True, exist_ok=True)
-        with open(f_name, "wb") as f:
-            pickle.dump(_cache_result, f)
+        self._write_item(f_name=f_name, item=_cache_result)
