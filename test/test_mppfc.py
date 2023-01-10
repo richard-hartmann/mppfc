@@ -282,16 +282,17 @@ def test_mppfc_stop():
         some_function(sleep_in_sec)
     time.sleep(0.5)
 
-    # terminate does interrupt the subprocess, so there is no
-    # communication back to the main process
-    # i.e., shared queue kwargs_q and dict kwargs_for_progress are not modified
+    # terminate does interrupt the subprocess, i.e. do not wait until the current
+    # argument hase been done.
+    # no result is cached, but mark the argument as done to yield a consistent state of the
+    # MultiProcCacheFunction instance.
     r = some_function.terminate()
     assert r is True
-    assert some_function.number_tasks_in_progress == 2
+    assert some_function.number_tasks_in_progress == 0
     assert some_function.number_tasks_issued_in_total == 4
-    assert some_function.number_tasks_done == 0
+    assert some_function.number_tasks_done == 2
     assert some_function.number_tasks_waiting == 2
-    assert some_function.number_tasks_not_done == 4
+    assert some_function.number_tasks_not_done == 2
 
 
 @mppfc.MultiProcCachedFunctionDec()
