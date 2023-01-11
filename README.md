@@ -7,7 +7,7 @@ b) persistent caching of the results to disk.
 Persistent caching becomes available by simply decorating a given function.
 With no more than two extra lines of code, parallel evaluation is realized.
 
-Here is a minimal example:
+Here is a [minimal example](./examples/minimal.py):
 
 ```python
 import mppfc
@@ -28,11 +28,59 @@ Once `wait()` returns, all parameters have been cached to disk.
 So calling the script a second time yields (almost immediately) the
 desired results in `y`.
 
-Evaluating only the `for` loop in a jupyter notebook cell will give
-you partial results if the background processes are still doing some work.
+Evaluating only the `for` loop in a jupyter notebook cell
+will give you partial results if the background processes are still doing some work.
 In that way you can already show successfully retrieved results.
+(see the examples [simple.ipynb](./examples/simple.ipynb) and [live_update.ipynb](./examples/live_update.ipynb))
 
-**ToDo**: reference to examples and documentation 
+For a nearly exhaustive example see [full.py](./examples/full.py).
+
+### pitfalls
+
+Note that arguments are distinguished by their binary representation obtained from the 
+[binfootprint](https://github.com/richard-hartmann/binfootprint) module.
+This implies that the integer `1` and the float `1.0` are treated as different arguments, even though
+in many numeric situations the result does not differ.
+
+```python
+import mppfc
+import math
+
+@mppfc.MultiProcCachedFunctionDec()
+def pitfall_1(x):
+    return math.sqrt(x)
+
+x = 1
+print("pitfall_1(x={}) = {}".format(x, pitfall_1(x=x)))
+# pitfall_1(x=1) = 1.0
+x = 1.0
+print("BUT, x={} in cache: {}".format(x, pitfall_1(x=x, _cache_flag="has_key")))
+# BUT, x=1.0 in cache: False
+print("and obviously: pitfall_1(x={}) = {}".format(x, pitfall_1(x=x, _cache_flag="no_cache")))
+# and obviously: pitfall_1(x=1.0) = 1.0
+```
+
+The same holds true for lists and tuples.
+
+```python
+import mppfc
+import math
+
+@mppfc.MultiProcCachedFunctionDec()
+def pitfall_2(arr):
+    return sum(arr)
+
+arr = [1, 2, 3]
+print("pitfall_2(arr={}) = {}".format(arr, pitfall_2(arr=arr)))
+# pitfall_2(arr=[1, 2, 3]) = 6
+arr = (1, 2, 3)
+print("BUT, arr={} in cache: {}".format(arr, pitfall_2(arr=arr, _cache_flag="has_key")))
+# BUT, arr=(1, 2, 3) in cache: False
+print("and obviously: pitfall_1(arr={}) = {}".format(arr, pitfall_2(arr=arr, _cache_flag="no_cache")))
+# and obviously: pitfall_1(arr=(1, 2, 3)) = 6
+```
+
+For more details see [binfootprint's README](https://github.com/richard-hartmann/binfootprint).
 
 ## Installation
 
@@ -78,6 +126,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-
-
