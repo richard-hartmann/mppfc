@@ -12,33 +12,11 @@ from binfootprint import dump
 hex_alphabet = "0123456789abcdef"
 
 
-class CacheFileBasedDec:
-    """
-    Provides a decorator to cache the return values of a function to disk.
-    """
-
-    def __init__(self, path=".cache", include_module_name=True):
-        """
-        Initialize the CacheFileBased class which caches function calls using python's pickle and a separate file
-        for each item.
-
-        The location where the corresponding files are stored is given by `path`.
-        The path is created if necessary. The actual files are in a subdirectory with name retrieved from the
-        name of the function and the name of the module defining that function.
-        It is, thus, safe to use the CacheFileBasedDec with the same path parameter on different functions.
-
-        :param path: the path under which the database (shelve) is stored
-        :param include_module_name: if True (default) the database is named `module.fnc_name`, otherwise `fnc_name`
-        """
-        self.path = path
-        self.include_module_name = include_module_name
-
-    def __call__(self, fnc):
-        return CacheFileBased(fnc, self.path, self.include_module_name)
-
-
 class CacheFileBased:
-    def __init__(self, fnc, path=".cache", include_module_name=True):
+    def __init__(self,
+                 fnc: Callable[..., Any],
+                 path: Union[str, pathlib.Path] = ".cache",
+                 include_module_name: bool = True):
         """
         Extend the function `fnc` by caching and adds the extra kwarg `_cache_flag` which
         modifies the caching behavior as follows:
@@ -53,19 +31,23 @@ class CacheFileBased:
         The difference lies in the storage of te cache. Here each item is stored in a different file.
         The filename is constructed from the hex representation of the hash value of the arguments
         of the function call, i.e., the key.
-        In order to cope with very large numbers of items, the hash value is split into three parts s1, s2 and f_name
-        which make up the path to the file: `path / module.fnc_name / s1 / s2 / f_name`.
+        In order to cope with very large numbers of items, the hash value is split into three parts
+        s1, s2 and f_name which make up the path to the file: `path / module.fnc_name / s1 / s2 / f_name`.
         The first two parts s1 and s2 represent 14 bits (16384 different values) each.
-        In that way up to 2.6e8 items can be accessed efficiently (according to a simple benchmark based on an ext4
-        file system).
+        In that way up to 2.6e8 items can be accessed efficiently (according to a simple benchmark based
+        on an ext4 file system, see doc/file_access_time.md for details)
 
         If `include_module_name` is set to False `fnc_name` only is used instead of `module.fnc_name`.
         This can be useful during developing stage. However, it obviously requires that function names
         need to be distinctive.
 
-        :param fnc: function to be cached
-        :param path: location where the cache data is stored
-        :param include_module_name: if True (default) the database is named `module.fnc_name`, otherwise `fnc_name`
+        Args:
+            fnc:
+                The function to be cached.
+            path (default '.cache):
+                The location where the cache data is stored.
+            include_module_name (default True):
+                If True the database is named `module.fnc_name`, otherwise `fnc_name`.
         """
         self.path = pathlib.Path(path).absolute()
         self.fnc = fnc
@@ -76,11 +58,15 @@ class CacheFileBased:
             self.cache_dir = self.path / self.fnc.__name__
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def param_hash_bytes(self, *args, **kwargs):
+    def param_hash_bytes(self, *args: Any, **kwargs: Any) -> bytes:
         """
-        calculate the hash value for the parameters `args` and `kwargs` with respect to the
-        function `fnc`. The full mapping (kwargs dictionary) between the name of the arguments and their values
-        including default values is used to calculate the hash.
+        Calculate the hash value for the parameters `args` and `kwargs` with respect to the
+        function `fnc`. The full mapping (kwargs dictionary) between the name of the arguments and their
+        values, including default values, is used to calculate the hash.
+
+        Args:
+            args: positional arguments intended to call `fnc`
+            kwargs: keyword arguments intended to call `fnc`
         """
         ba = self.fnc_sig.bind(*args, **kwargs)
         ba.apply_defaults()
@@ -89,19 +75,28 @@ class CacheFileBased:
         return fnc_args_key_bytes
 
     @staticmethod
-    def four_bit_int_to_hex(i):
-        """int to single hex character (int representation with base 16)"""
+    def four_bit_int_to_hex(i: int) -> str:
+        """
+        Convert the integer `i` to single hex digit (i.e., int representation with base 16).
+
+        Args:
+            i: integer to be converted (0 <= i <= 15 must hold)
+        Returns:
+            the hex digit as single character string
+        """
         if (i < 0) or (i >= 16):
             raise ValueError("0 <= i < 16 needs to hold!")
         return hex_alphabet[i]
 
     @staticmethod
-    def hash_bytes_to_3_hex(hash_bytes):
+    def hash_bytes_to_3_hex(hash_bytes: bytes) -> tuple[str, str, str]:
         """
         Split a byte sequence into 3 parts of hex strings.
-        The first and the second part are 14 bit (16384 different values).
-        The third part is the rest.
-        That number was chosen
+        The first and the second part are 4 digit hex strings which encode 14 bit each
+        (16384 different values). The third part encodes the rest.
+        That number 16384 was chosen from the file system benchmark (see doc/file_access_time.md).
+        Up to that number of files in a single directory, the time to open a file a read a single
+        character remains nearly constant.
 
         Notes:
             the 8 bits b of the first byte are associated with the parts 1,2 and 3 as follows
@@ -109,6 +104,13 @@ class CacheFileBased:
 
             the 8 bits of the second byte are associated with the parts 1 and 2 as follows
             bbbbbbbb = 11112222
+
+        Args:
+            hash_bytes:
+                A byte sequence representing a hash value.
+        Returns:
+            A tuple with three strings consisting of hex digits only.
+            The first two string have length of 4 characters each.
         """
         b = hash_bytes[0]
         b1 = (b & 0b11000000) >> 6
@@ -133,9 +135,13 @@ class CacheFileBased:
 
         return s1, s2, s3
 
-    def get_f_name(self, *args, **kwargs):
+    def get_f_name(self, *args: Any, **kwargs: Any) -> pathlib.Path:
         """
-        construct path to the file containing the cache result from the hash value of *args and **kwargs
+        Construct the path to the file which contains the cached result for the call fnc(*args, **kwargs).
+
+        Args:
+            args: positional arguments intended to call `fnc`
+            kwargs: keyword arguments intended to call `fnc`
         """
         fnc_args_key_bytes = self.param_hash_bytes(*args, **kwargs)
         s1, s2, s3 = self.hash_bytes_to_3_hex(fnc_args_key_bytes)
@@ -144,7 +150,12 @@ class CacheFileBased:
     @staticmethod
     def item_exists(f_name: pathlib.Path) -> bool:
         """
+        Check existence of the file with path `f_name`.
 
+        Args:
+            f_name: file name to check for existence
+        Returns:
+            True if the path `f_name` exists, otherwise False.
         """
         try:
             return f_name.exists()
@@ -228,3 +239,38 @@ class CacheFileBased:
             )
         f_name.parent.mkdir(parents=True, exist_ok=True)
         self._write_item(f_name=f_name, item=_cache_result)
+
+
+class CacheFileBasedDec:
+    """
+    Provides a decorator to cache the return values of a function to disk.
+    """
+
+    def __init__(self, path: Union[str, pathlib.Path] = '.cache', include_module_name: bool = True):
+        """
+        Allows to adjust `path` and `include_module_name` to be passed to the CacheFileBased constructor.
+
+        Args:
+            path (default '.cache'):
+                The path under which cache data is stored.
+                The path is created if necessary. The actual files are in a subdirectory with name
+                retrieved from the name of the function and the name of the module defining that function.
+                It is, thus, safe to use the CacheFileBasedDec with the same path parameter on
+                different functions.
+            include_module_name (default True):
+                If True the database is named `module.fnc_name`, otherwise `fnc_name`.
+        """
+        self.path = path
+        self.include_module_name = include_module_name
+
+    def __call__(self, fnc: Callable[..., Any]) -> CacheFileBased:
+        """
+        The returned CacheFileBased instance extends the function `fnc` by caching.
+
+        Args:
+            fnc: the function to be cached
+
+        Returns:
+            an instance of CacheFileBased
+        """
+        return CacheFileBased(fnc, self.path, self.include_module_name)
