@@ -37,7 +37,6 @@ import time
 import traceback
 from typing import Any, Callable, Union
 from pathlib import Path
-import sys
 import warnings
 
 # third party imports

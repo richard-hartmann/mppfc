@@ -1,11 +1,13 @@
-import os
-
-from binfootprint import dump
+# python imports
 import hashlib
 from inspect import signature
+import os
 import pathlib
 import pickle
+from typing import Any, Callable, Union
 
+# third party imports
+from binfootprint import dump
 
 hex_alphabet = "0123456789abcdef"
 
@@ -140,21 +142,24 @@ class CacheFileBased:
         return self.cache_dir / s1 / s2 / s3
 
     @staticmethod
-    def item_exists(f_name):
+    def item_exists(f_name: pathlib.Path) -> bool:
+        """
+
+        """
         try:
             return f_name.exists()
         except FileNotFoundError:
             return False
 
     @staticmethod
-    def _write_item(f_name, item):
+    def _write_item(f_name: pathlib.Path, item: Any) -> None:
         """
         writes item to disk at location f_name
 
         Removes partially written file on InterruptError.
 
         Args:
-            f_name: filename where to dump the item
+            f_name: Path object, where to dump the item
             item: the python object to be dumped
         """
         f_name.parent.mkdir(parents=True, exist_ok=True)
@@ -165,9 +170,19 @@ class CacheFileBased:
             os.remove(f_name)
             raise
 
-    def __call__(self, *args, _cache_flag=None, **kwargs):
+    def __call__(self, *args: Any, _cache_flag: Union[str, None] = None, **kwargs: Any) -> Any:
         """
-        the actual wrapper function that implements the caching for `fnc`
+        the actual wrapper function that implements the caching for call `fnc(*args, **kwargs)`
+
+        Args:
+            _cache_flag: may be None or one of the following strings
+                'no_cache': Simple call of `fnc` without caching.
+                'update': Call `fnc` and update the cache with recent return value.
+                'has_key': Return `True` if the call has already been cached, otherwise `False`.
+                'cache_only': Return result from cache. Raises a `KeyError` if the result has not been cached yet.
+
+        Returns:
+            The result of `fnc(*args, **kwargs)`. If `_cache_flag == 'has_key'` return a boolean.
         """
         if _cache_flag == "no_cache":
             return self.fnc(*args, **kwargs)
@@ -194,7 +209,16 @@ class CacheFileBased:
                 with open(f_name, "rb") as f:
                     return pickle.load(f)
 
-    def set_result(self, *args, _cache_result, _cache_overwrite=False, **kwargs):
+    def set_result(self, *args: Any, _cache_result: Any, _cache_overwrite: bool = False, **kwargs: Any) -> None:
+        """
+        Write the results given in `_cache_result` which belongs to `*args` and `**kwargs` to the cache.
+        Raise a ValueError if a result for such  `*args` and `**kwargs` exists already.
+        Setting `_cache_overwrite` True overwrites an existing result without raises an exception.
+
+        Args:
+            _cache_result: the python object to be cached as result
+            _cache_overwrite (default False): if True, silently overwrite an existing result in the cache
+        """
         f_name = self.get_f_name(*args, **kwargs)
         item_exists = self.item_exists(f_name)
         if item_exists and not _cache_overwrite:
