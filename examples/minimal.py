@@ -9,6 +9,7 @@ def slow_function(x):
     time.sleep(1)
     return x
 
+
 # uncomment to clear the cache, be careful what you are doing
 # this will remove a whole directory tree WITHOUT ASKING
 # shutil.rmtree(slow_function.cache_dir)

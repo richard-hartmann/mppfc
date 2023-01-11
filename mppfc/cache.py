@@ -13,10 +13,12 @@ hex_alphabet = "0123456789abcdef"
 
 
 class CacheFileBased:
-    def __init__(self,
-                 fnc: Callable[..., Any],
-                 path: Union[str, pathlib.Path] = ".cache",
-                 include_module_name: bool = True):
+    def __init__(
+        self,
+        fnc: Callable[..., Any],
+        path: Union[str, pathlib.Path] = ".cache",
+        include_module_name: bool = True,
+    ):
         """
         Extend the function `fnc` by caching and adds the extra kwarg `_cache_flag` which
         modifies the caching behavior as follows:
@@ -181,7 +183,9 @@ class CacheFileBased:
             os.remove(f_name)
             raise
 
-    def __call__(self, *args: Any, _cache_flag: Union[str, None] = None, **kwargs: Any) -> Any:
+    def __call__(
+        self, *args: Any, _cache_flag: Union[str, None] = None, **kwargs: Any
+    ) -> Any:
         """
         the actual wrapper function that implements the caching for call `fnc(*args, **kwargs)`
 
@@ -220,7 +224,13 @@ class CacheFileBased:
                 with open(f_name, "rb") as f:
                     return pickle.load(f)
 
-    def set_result(self, *args: Any, _cache_result: Any, _cache_overwrite: bool = False, **kwargs: Any) -> None:
+    def set_result(
+        self,
+        *args: Any,
+        _cache_result: Any,
+        _cache_overwrite: bool = False,
+        **kwargs: Any
+    ) -> None:
         """
         Write the results given in `_cache_result` which belongs to `*args` and `**kwargs` to the cache.
         Raise a ValueError if a result for such  `*args` and `**kwargs` exists already.
@@ -246,7 +256,11 @@ class CacheFileBasedDec:
     Provides a decorator to cache the return values of a function to disk.
     """
 
-    def __init__(self, path: Union[str, pathlib.Path] = '.cache', include_module_name: bool = True):
+    def __init__(
+        self,
+        path: Union[str, pathlib.Path] = ".cache",
+        include_module_name: bool = True,
+    ):
         """
         Allows to adjust `path` and `include_module_name` to be passed to the CacheFileBased constructor.
 

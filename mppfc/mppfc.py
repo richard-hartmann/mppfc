@@ -95,13 +95,16 @@ class ErroneousFunctionCall(Exception):
     This class is used as result if the function call failed.
     The member 'exc' holds the exception causing the failure.
     """
+
     def __init__(self, ex: Exception, tb: str):
         super().__init__()
         self.ex = ex
         self.tb = tb
 
     def __str__(self):
-        return "original Exception from subprocess ({}: {})\n{}".format(self.ex.__class__.__name__, self.ex, self.tb)
+        return "original Exception from subprocess ({}: {})\n{}".format(
+            self.ex.__class__.__name__, self.ex, self.tb
+        )
 
 
 class MultiProcCachedFunction:
@@ -195,7 +198,7 @@ class MultiProcCachedFunction:
         # contains the args to be evaluated and their hash value
         self.kwargs_q = self.m.Queue()
 
-        # Any arg that has been put to the Queue, ist hash is also added to that dict (should be a set), 
+        # Any arg that has been put to the Queue, ist hash is also added to that dict (should be a set),
         # so we can keep track of what has been put to the Queue. The values of the dict are irrelevant.
         # When an item has been processed (successfully crunched and cached to disk or failed) it is removed from
         # that dict.
@@ -203,7 +206,7 @@ class MultiProcCachedFunction:
 
         # save exception and traceback, so it can be raised in the main process
         self.erroneous_call_dict = self.m.dict()
-      
+
         self.total_cpu_time = mp.Value("d", 0.0)
         self.stop_event = self.m.Event()
 
@@ -256,18 +259,18 @@ class MultiProcCachedFunction:
     @property
     def number_tasks_done(self) -> int:
         """
-            Returns:
-                The number of tasks/arguments which have been processed.
-                Note that if processing an arguments raises an exception, this argument is marked as done, but it is not
-                added to the cache.
+        Returns:
+            The number of tasks/arguments which have been processed.
+            Note that if processing an arguments raises an exception, this argument is marked as done, but it is not
+            added to the cache.
         """
         return self.number_tasks_issued_in_total - self.number_tasks_not_done
 
     @property
     def number_tasks_failed(self) -> int:
         """
-            Returns:
-                The number of tasks/arguments which have raised an exception while been processed.
+        Returns:
+            The number of tasks/arguments which have raised an exception while been processed.
         """
         return len(self.erroneous_call_dict)
 
@@ -377,7 +380,6 @@ class MultiProcCachedFunction:
                 "You cannot use the '_cache_flag' kwarg if in multiprocessing mode"
             )
 
-
         # see if we can find the result in the cache
         try:
             return self.cached_fnc(*args, **kwargs, _cache_flag="cache_only")
@@ -430,8 +432,10 @@ class MultiProcCachedFunction:
             total_cpu_time:
                 A shared float Value to accumulate the CPU time used to process the arguments.
         """
+
         def sigterm_to_interrupted_error(*args):
             raise InterruptedError("received SIGTERM")
+
         signal.signal(signal.SIGTERM, sigterm_to_interrupted_error)
 
         while not stop_event.is_set():
@@ -554,7 +558,7 @@ class MultiProcCachedFunction:
             self.number_tasks_issued_in_total,
             l_num_proc,
             self.number_tasks_in_progress,
-            self.number_tasks_failed
+            self.number_tasks_failed,
         )
         if self.number_tasks_done > 0:
             avrg_cpu_time = self.total_cpu_time.value / self.number_tasks_done

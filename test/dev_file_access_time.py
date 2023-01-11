@@ -57,10 +57,10 @@ if __name__ == "__main__":
     samples = 100
 
     log_n_list = list(range(log_n_low, log_n_high))
-    n_list = [2 ** ni for ni in log_n_list]
+    n_list = [2**ni for ni in log_n_list]
 
     for log_n in log_n_list:
-        n = 2 ** log_n
+        n = 2**log_n
         create_data(number_of_files=n, where=sub_dir)
 
     fig, ax = plt.subplots(nrows=2, figsize=(8, 10))
@@ -72,12 +72,12 @@ if __name__ == "__main__":
         data_file_exists = np.zeros(shape=(len(log_n_list), 2))
         for k in range(num_runs):
             for i, log_n in enumerate(log_n_list):
-                n = 2 ** log_n
+                n = 2**log_n
                 access_times = measure_file_access_time(
                     number_of_files=n, how_many_time=samples, where=sub_dir
                 )
-                mean = np.mean(access_times) / 10 ** 6
-                devi = np.std(access_times) / 10 ** 6
+                mean = np.mean(access_times) / 10**6
+                devi = np.std(access_times) / 10**6
                 print(l, k, n, mean, devi)
                 data_file_exists[i, 0] += mean
                 data_file_exists[i, 1] += devi
@@ -98,12 +98,12 @@ if __name__ == "__main__":
     for l in range(5):
         for k in range(num_runs):
             for i, log_n in enumerate(log_n_list):
-                n = 2 ** log_n
+                n = 2**log_n
                 access_times = measure_file_read_time(
                     number_of_files=n, how_many_time=samples // 10, where=sub_dir
                 )
-                mean = np.mean(access_times) / 10 ** 6
-                devi = np.std(access_times) / 10 ** 6
+                mean = np.mean(access_times) / 10**6
+                devi = np.std(access_times) / 10**6
                 print(l, k, n, mean, devi)
                 data_file_read[i, 0] += mean
                 data_file_read[i, 1] += devi

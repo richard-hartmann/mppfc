@@ -13,7 +13,7 @@ import shutil
 #   where 'module_name' is the name of the module defining the function
 #   and 'function_name' the name of the function.
 #   if `include_module_name` is set to `False`, 'path / function_name' is used as cache directory.
-@mppfc.MultiProcCachedFunctionDec(path='./path_for_cache', include_module_name=True)
+@mppfc.MultiProcCachedFunctionDec(path="./path_for_cache", include_module_name=True)
 def slow_function2(x):
     # complicated stuff
     time.sleep(1)
@@ -36,9 +36,9 @@ print("cache data will be at:", slow_function2.cache_dir)
 #       'cache_only': Raises a `KeyError` if the result has not been cached yet.
 x = 3
 y = slow_function2(x=x)
-print('slow_function(x={}) = {}'.format(x, y))
-y = slow_function2(x=x, _cache_flag='has_key')
-print('x={} is in cache: {}'.format(x, y))
+print("slow_function(x={}) = {}".format(x, y))
+y = slow_function2(x=x, _cache_flag="has_key")
+print("x={} is in cache: {}".format(x, y))
 
 # now turn on multiprocessing
 # num_proc controls the number of client processes. This parameter can be
@@ -62,8 +62,8 @@ slow_function2.wait(status_interval_in_sec=1)
 # Now the results are quickly accessible from cache.
 # The cache flag 'cache_only' is of course not necessary here and of educational purpose only.
 for x in [4, 10]:
-    y = slow_function2(x, _cache_flag='cache_only')
-    print('slow_function(x={}) = {} (from cache)'.format(x, y))
+    y = slow_function2(x, _cache_flag="cache_only")
+    print("slow_function(x={}) = {} (from cache)".format(x, y))
 
 # Start multiprocessing again
 slow_function2.start_mp(num_proc=2)
@@ -115,4 +115,3 @@ while True:
         break
 # The status shows that some arguments have not been processed.
 slow_function2.status()
-
