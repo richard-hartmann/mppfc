@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mppfc"
-version = "1.0.0"
+version = "1.0.1"
 description = "multi-processing persistent function cache"
 authors = ["Richard Hartmann <richard_hartmann@gmx.de>"]
 license = "MIT"

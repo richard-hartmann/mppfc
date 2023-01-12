@@ -1,5 +1,7 @@
 # mppfc - Multi-Processing Persistent Function Cache
 
+[![PyPI version](https://badge.fury.io/py/mppfc.svg)](https://badge.fury.io/py/mppfc)
+
 The `mppfc` module allows to speed up the evaluation of computationally 
 expansive functions by 
 a) processing several arguments in parallel and 
@@ -7,7 +9,7 @@ b) persistent caching of the results to disk.
 Persistent caching becomes available by simply decorating a given function.
 With no more than two extra lines of code, parallel evaluation is realized.
 
-Here is a [minimal example](./examples/minimal.py):
+Here is a [minimal example](https://github.com/richard-hartmann/mppfc/blob/main/examples/minimal.py):
 
 ```python
 import mppfc
@@ -31,9 +33,10 @@ desired results in `y`.
 Evaluating only the `for` loop in a jupyter notebook cell
 will give you partial results if the background processes are still doing some work.
 In that way you can already show successfully retrieved results.
-(see the examples [simple.ipynb](./examples/simple.ipynb) and [live_update.ipynb](./examples/live_update.ipynb))
+(see the examples [simple.ipynb](https://github.com/richard-hartmann/mppfc/blob/main/examples/simple.ipynb) 
+and [live_update.ipynb](https://github.com/richard-hartmann/mppfc/blob/main/examples/live_update.ipynb))
 
-For a nearly exhaustive example see [full.py](./examples/full.py).
+For a nearly exhaustive example see [full.py](https://github.com/richard-hartmann/mppfc/blob/main/examples/full.py).
 
 ### pitfalls
 
