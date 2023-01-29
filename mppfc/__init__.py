@@ -5,3 +5,4 @@ from .mppfc import MultiProcCachedFunctionDec
 
 from .cache import CacheFileBased
 from .cache import CacheFileBasedDec
+from .cache import CacheInit

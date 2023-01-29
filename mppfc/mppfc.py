@@ -456,7 +456,7 @@ class MultiProcCachedFunction:
                 del kwargs_hash_set[arg_hash]
                 t1 = time.perf_counter_ns()
                 with total_cpu_time.get_lock():
-                    total_cpu_time.value += (t1 - t0) / 10**9
+                    total_cpu_time.value += (t1 - t0) / 10 ** 9
                 kwargs_q.task_done()
 
     def wait(self, status_interval_in_sec: Union[float, None] = None) -> None:

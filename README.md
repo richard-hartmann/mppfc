@@ -38,6 +38,57 @@ and [live_update.ipynb](https://github.com/richard-hartmann/mppfc/blob/main/exam
 
 For a nearly exhaustive example see [full.py](https://github.com/richard-hartmann/mppfc/blob/main/examples/full.py).
 
+### caching class instantiation
+
+*new in Version 1.1*
+
+When class instantiation, i.e. calling `__init__(...)` takes very long, you can cache the instantiation
+by subclassing from `mppfc.CacheInit`.
+
+```python
+class SomeClass(mppfc.CacheInit):
+    """instantiation is being cached simply by subclassing from `CacheInit`"""
+    def __init__(self, a, t=1):
+        time.sleep(t)
+        self.a = a
+```
+
+Note that subclassing such a cached class is not supported.
+If you try that, a `CacheInitSubclassError` is raised.
+However, you can simply circumvent this problem by creating a dummy class for caching, e.g.
+
+```python
+class S0:
+    s0 = 's0'
+
+class S1(S0):
+    s1 = 's1'
+    def __init__(self, s):
+        self.s = s
+
+class S1Cached(mppfc.CacheInit, S1):
+    """dummy 'subclass' of S1 with caching"""
+    def __init__(self, s):
+        super().__init__(s)
+
+class S2(mppfc.CacheInit, S1):
+    """S2 inherits from S1 AND is being cached"""
+    s2 = "s2"
+    def __init__(self, s):
+        super().__init__(s)
+```
+
+When subclassing from `CacheInit` the following extra keyword arguments can be used
+to control the Cache
+
+* `_CacheInit_serializer`: a function which serializes an object to binary data
+    (default is binfootprint.dump).
+* `_CacheInit_path`: the path where to put the cache data (default is '.CacheInit')
+* `_CacheInit_include_module_name`: if `True` (default) include the name of module where the class
+   is defined into the path where the instances will be cached.
+   (useful during development stage where Classes might be moved around or module name are still
+   under debate)
+
 ### pitfalls
 
 Note that arguments are distinguished by their binary representation obtained from the 

@@ -244,7 +244,7 @@ def test_multi_proc_dec():
         r = some_function(x=sleep_in_sec)
         assert r is None
     t1 = time.perf_counter_ns()
-    time_to_add = (t1 - t0) / 10**9
+    time_to_add = (t1 - t0) / 10 ** 9
     print("all added {:.3e}s".format(time_to_add))
     t0 = time.perf_counter_ns()
     time.sleep(sleep_in_sec)
@@ -252,7 +252,7 @@ def test_multi_proc_dec():
     print("wait to finish ...")
     some_function.wait()
     t1 = time.perf_counter_ns()
-    time_wait = (t1 - t0) / 10**9
+    time_wait = (t1 - t0) / 10 ** 9
     print("all done {:.3e}s".format(time_wait))
     some_function.status()
 
@@ -266,7 +266,7 @@ def test_multi_proc_dec():
         print(r)
         assert r is not None
     t1 = time.perf_counter_ns()
-    time_to_load_from_cache = (t1 - t0) / 10**9
+    time_to_load_from_cache = (t1 - t0) / 10 ** 9
     print("all loaded from cache {:.3e}s".format(time_to_load_from_cache))
     assert time_to_load_from_cache < 1
 
@@ -417,3 +417,4 @@ if __name__ == "__main__":
     # test_mppfc_stop()
     # test_function_with_error()
     test_join()
+    pass

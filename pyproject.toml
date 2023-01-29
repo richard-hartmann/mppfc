@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mppfc"
-version = "1.0.1"
+version = "1.1.0"
 description = "multi-processing persistent function cache"
 authors = ["Richard Hartmann <richard_hartmann@gmx.de>"]
 license = "MIT"
@@ -19,6 +19,7 @@ binfootprint = "^1.0.0"
 matplotlib = "^3.6.0"
 numpy = "^1.22.0"
 notebook = "^6.5.2"
+black = "^22.12.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
