@@ -136,6 +136,12 @@ print("and obviously: pitfall_1(arr={}) = {}".format(arr, pitfall_2(arr=arr, _ca
 
 For more details see [binfootprint's README](https://github.com/richard-hartmann/binfootprint).
 
+## ToDo
+
+- Set the signature of the wrapper `_cached_init` to the signature of `cls.__init__` (if possible).
+  Probably requires some MetaClass programming.
+- Create online documentation with mkdocs.
+
 ## Installation
 
 ### pip

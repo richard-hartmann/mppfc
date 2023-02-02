@@ -15,7 +15,8 @@ import binfootprint
 hex_alphabet = "0123456789abcdef"
 
 log = logging.getLogger(__name__)
-log.setLevel('DEBUG')
+log.setLevel("DEBUG")
+
 
 class CacheFileBased:
     def __init__(
@@ -234,7 +235,7 @@ class CacheFileBased:
         *args: Any,
         _cache_result: Any,
         _cache_overwrite: bool = False,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """
         Write the results given in `_cache_result` which belongs to `*args` and `**kwargs` to the cache.
@@ -327,15 +328,19 @@ class DenyFurtherSubclassing:
 
     def __call__(self, **kwargs):
         raise CacheInitSubclassError(
-            f"You cannot subclass a class which inherits from 'CacheInit'! " +
-            f"The class '{self.cls.__qualname__}' has the method resolve order (MRO) {self.cls.__mro__}"
+            f"You cannot subclass a class which inherits from 'CacheInit'! "
+            + f"The class '{self.cls.__qualname__}' has the method resolve order (MRO) {self.cls.__mro__}"
         )
 
 
-def _cached_init(obj, *args, **kwargs):
-    for kwa in CacheInit.special_kwargs:
-        if kwa in kwargs:
-            del kwargs[kwa]
+def _cached_init(
+    obj,
+    *args,
+    _CacheInit_serializer=binfootprint_serializer,
+    _CacheInit_path=".CacheInit",
+    _CacheInit_include_module_name=True,
+    **kwargs,
+):
     if not obj.loaded_from_cache:
         obj.init_of_subclass(*args, **kwargs)
         key = _gen_hash_key(
@@ -344,28 +349,6 @@ def _cached_init(obj, *args, **kwargs):
         full_path = obj.path_for_cache / key
         with open(full_path, "wb") as f:
             pickle.dump(obj, f)
-
-
-def _parse_special_kwargs(kwargs: dict) -> tuple[Callable[[Any], bytes], str, bool]:
-    if "_CacheInit_serializer" in kwargs:
-        serializer = kwargs["_CacheInit_serializer"]
-        del kwargs["_CacheInit_serializer"]
-    else:
-        serializer = binfootprint_serializer
-
-    if "_CacheInit_path" in kwargs:
-        path = kwargs["_CacheInit_path"]
-        del kwargs["_CacheInit_path"]
-    else:
-        path = ".CacheInit"
-
-    if "_CacheInit_include_module_name" in kwargs:
-        include_module_name = kwargs["_CacheInit_include_module_name"]
-        del kwargs["_CacheInit_include_module_name"]
-    else:
-        include_module_name = True
-
-    return serializer, path, include_module_name
 
 
 def _gen_hash_key(
@@ -379,16 +362,16 @@ def _gen_hash_key(
     Convert the resulting dict to a tuple of (key, value) sorted by the keys of the dictionary.
     Return the SHA256 hex string of the binary data of that tuple.
     """
-    log.debug(f'exec gen_hash_key, args={args}, kwargs={kwargs}')
-    log.debug(f'signature = {sig}')
+    log.debug(f"exec gen_hash_key, args={args}, kwargs={kwargs}")
+    log.debug(f"signature = {sig}")
     ba = sig.bind(*args, **kwargs)
     ba.apply_defaults()
     all_kwargs = ba.arguments
-    log.debug(f'ba={ba}')
+    log.debug(f"ba={ba}")
     all_kwargs_sorted_tuple = tuple(
         (arg_i, all_kwargs[arg_i]) for arg_i in sorted(all_kwargs)
     )
-    log.debug(f'exec gen_hash_key, all_kwargs_sorted_tuple={all_kwargs_sorted_tuple}')
+    log.debug(f"exec gen_hash_key, all_kwargs_sorted_tuple={all_kwargs_sorted_tuple}")
     return hashlib.sha256(serializer(all_kwargs_sorted_tuple)).hexdigest()
 
 
@@ -411,7 +394,9 @@ def _get_path_for_cache(
     return p
 
 
-def _remove_params_from_signature(sig: inspect.Signature, params: Union[str, tuple[str, ...]]) -> inspect.Signature:
+def _remove_params_from_signature(
+    sig: inspect.Signature, params: Union[str, tuple[str, ...]]
+) -> inspect.Signature:
     """
     returns a copy of `sig` (signature of a callable) but without the parameters `params`
 
@@ -425,10 +410,10 @@ def _remove_params_from_signature(sig: inspect.Signature, params: Union[str, tup
 
     list_of_params = []
     if isinstance(params, str):
-        params = (params, )
+        params = (params,)
 
     for p in params_of_sig:
-        if p not in  params:
+        if p not in params:
             list_of_params.append(params_of_sig[p])
 
     return inspect.Signature(list_of_params)
@@ -439,9 +424,20 @@ class CacheInit:
     sig_of_subclass: inspect.Signature = None
     serializer: Callable[[Any], bytes] = None
 
-    special_kwargs = ['_CacheInit_serializer', '_CacheInit_path', '_CacheInit_include_module_name']
+    special_kwargs = [
+        "_CacheInit_serializer",
+        "_CacheInit_path",
+        "_CacheInit_include_module_name",
+    ]
 
-    def __new__(cls, *args: tuple, **kwargs: dict) -> object:
+    def __new__(
+        cls,
+        *args: tuple,
+        _CacheInit_serializer=binfootprint_serializer,
+        _CacheInit_path=".CacheInit",
+        _CacheInit_include_module_name=True,
+        **kwargs: dict,
+    ) -> object:
         """
         implements caching of object initialization
 
@@ -465,7 +461,9 @@ class CacheInit:
         # and load fills it with live by calling something like __setstate__
         # on the loaded data
         if (len(args) == 0) and (len(kwargs) == 0):
-            log.debug("found empty parameters -> create instance using super().__new__(...)")
+            log.debug(
+                "found empty parameters -> create instance using super().__new__(...)"
+            )
             try:
                 new_instance = super().__new__(cls, *args, **kwargs)
             except TypeError:
@@ -474,15 +472,14 @@ class CacheInit:
             log.debug("set loaded_from_cache to False")
             return new_instance
 
-        serializer, path, include_module_name = _parse_special_kwargs(kwargs)
         log.debug(f"__new__ has keyword args {kwargs}")
-        cls.serializer = staticmethod(serializer)
+        cls.serializer = staticmethod(_CacheInit_serializer)
 
         cls.path_for_cache = _get_path_for_cache(
             cls_name=cls.__name__,
             mod_name=cls.__module__,
-            path=path,
-            include_module_name=include_module_name,
+            path=_CacheInit_path,
+            include_module_name=_CacheInit_include_module_name,
         )
         log.debug(f"path for cache is {cls.path_for_cache} (create if necessary)")
         cls.path_for_cache.mkdir(parents=True, exist_ok=True)
@@ -491,7 +488,9 @@ class CacheInit:
             sig=cls.sig_of_subclass, args=args, kwargs=kwargs, serializer=cls.serializer
         )
         full_path = cls.path_for_cache / key
-        log.debug(f"full_path for caching based on init parameters *args and **kwargs is {full_path}")
+        log.debug(
+            f"full_path for caching based on init parameters *args and **kwargs is {full_path}"
+        )
 
         if full_path.exists():
             log.debug("path exists! -> load cache data")
@@ -500,7 +499,9 @@ class CacheInit:
                 new_instance = pickle.load(f)
                 # mark that it comes from the cache, which prevents __init__ to be called
                 new_instance.loaded_from_cache = True
-                log.debug("instance created via pickle.load, set loaded_from_cache to True")
+                log.debug(
+                    "instance created via pickle.load, set loaded_from_cache to True"
+                )
                 return new_instance
 
         # in case no cached object was found, create the bare object of type cls
@@ -525,29 +526,39 @@ class CacheInit:
         Remember that this gets called when CacheInit is being subclassed, i.e. when the line
         NewClass(CacheInit) is parsed.
         """
-        log.debug(f"hijack class '{cls.__qualname__}', since it derives from 'CacheInit'")
+        log.debug(
+            f"hijack class '{cls.__qualname__}', since it derives from 'CacheInit'"
+        )
         if inspect.isbuiltin(super().__init_subclass__):
             log.debug(
-                "super().__init_subclass__ appears to be built-in, we conclude it is object.__init_subclass__ " +
-                "and call 'super().__init_subclass__()'"
+                "super().__init_subclass__ appears to be built-in, we conclude it is object.__init_subclass__ "
+                + "and call 'super().__init_subclass__()'"
             )
             super().__init_subclass__()
         else:
-            log.debug(f"call {super().__init_subclass__.__qualname__}(cls={cls}, **kwargs={kwargs}) ...")
+            log.debug(
+                f"call {super().__init_subclass__.__qualname__}(cls={cls}, **kwargs={kwargs}) ..."
+            )
             super().__init_subclass__(**kwargs)
             log.debug("done!")
 
         # store the original init function of the subclass cls
         cls.init_of_subclass = cls.__init__
-        log.debug(f"saved {cls.__init__.__qualname__} to {cls.__qualname__}.init_of_subclass")
+        log.debug(
+            f"saved {cls.__init__.__qualname__} to {cls.__qualname__}.init_of_subclass"
+        )
         cls.sig_of_subclass = _remove_params_from_signature(
             sig=signature(cls.__init__),
-            params='self',
+            params="self",
         )
         log.debug(f"saved signature of cls: {cls.sig_of_subclass}")
         # overwrite the init of the subclass cls by cached_init
         # which calls _init_of_subclass only if loaded_from_cache is False
-        log.debug(f"overwrite {cls.__init__.__qualname__} with CacheInit.cached_init(obj, *args, **kwargs)")
+        log.debug(
+            f"overwrite {cls.__init__.__qualname__} with CacheInit.cached_init(obj, *args, **kwargs)"
+        )
         cls.__init__ = _cached_init
-        log.debug(f"overwrite {cls.__init_subclass__.__qualname__} with CacheInit.deny_further_subclassing")
+        log.debug(
+            f"overwrite {cls.__init_subclass__.__qualname__} with CacheInit.deny_further_subclassing"
+        )
         cls.__init_subclass__ = DenyFurtherSubclassing(cls)
