@@ -20,6 +20,8 @@ log.setLevel("DEBUG")
 
 
 class CacheFileBased:
+    cache_flags = ['no_cache', 'update', 'has_key', 'cache_only']
+
     def __init__(
         self,
         fnc: FunctionType,
@@ -213,6 +215,9 @@ class CacheFileBased:
         Returns:
             The result of `fnc(*args, **kwargs)`. If `_cache_flag == 'has_key'` return a boolean.
         """
+        if _cache_flag and _cache_flag not in self.cache_flags:
+            raise ValueError(f"_cache_flag has unknown value '{_cache_flag}', expect one out of {self.cache_flags}")
+
         if _cache_flag == "no_cache":
             return self.fnc(*args, **kwargs)
         else:
