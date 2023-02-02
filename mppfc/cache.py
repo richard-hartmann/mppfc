@@ -20,7 +20,7 @@ log.setLevel("DEBUG")
 
 
 class CacheFileBased:
-    cache_flags = ['no_cache', 'update', 'has_key', 'cache_only']
+    cache_flags = ["no_cache", "update", "has_key", "cache_only"]
 
     def __init__(
         self,
@@ -216,7 +216,9 @@ class CacheFileBased:
             The result of `fnc(*args, **kwargs)`. If `_cache_flag == 'has_key'` return a boolean.
         """
         if _cache_flag and _cache_flag not in self.cache_flags:
-            raise ValueError(f"_cache_flag has unknown value '{_cache_flag}', expect one out of {self.cache_flags}")
+            raise ValueError(
+                f"_cache_flag has unknown value '{_cache_flag}', expect one out of {self.cache_flags}  "
+            )
 
         if _cache_flag == "no_cache":
             return self.fnc(*args, **kwargs)
@@ -389,10 +391,7 @@ def _gen_hash_key(
 
 
 def _get_path_for_cache(
-    cls_name: str,
-    mod_name: str,
-    path: str,
-    include_module_name: bool,
+    cls_name: str, mod_name: str, path: str, include_module_name: bool,
 ) -> pathlib.Path:
     """
     construct the directory for dumping the object which is identified by its hash value
@@ -561,8 +560,7 @@ class CacheInit:
             f"saved {cls.__init__.__qualname__} to {cls.__qualname__}.init_of_subclass"
         )
         cls.sig_of_subclass = _remove_params_from_signature(
-            sig=signature(cls.__init__),
-            params="self",
+            sig=signature(cls.__init__), params="self",
         )
         log.debug(f"saved signature of cls: {cls.sig_of_subclass}")
         # overwrite the init of the subclass cls by cached_init

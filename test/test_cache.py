@@ -68,7 +68,7 @@ def test_cache_class_init():
     t0 = time.perf_counter_ns()
     sc = SomeClass(a=1, t=1)
     t1 = time.perf_counter_ns()
-    assert (t1 - t0) / 10**9 > 1
+    assert (t1 - t0) / 10 ** 9 > 1
     assert isinstance(sc, SomeClass)
     assert sc.a == 1
     assert sc.__init__.__name__ == "_cached_init"
@@ -78,7 +78,7 @@ def test_cache_class_init():
     t0 = time.perf_counter_ns()
     sc = SomeClass(a=1, t=1)
     t1 = time.perf_counter_ns()
-    assert (t1 - t0) / 10**9 < 1
+    assert (t1 - t0) / 10 ** 9 < 1
     assert isinstance(sc, SomeClass)
     assert sc.a == 1
     assert sc.__init__.__name__ == "_cached_init"
@@ -93,7 +93,7 @@ def test_cache_class_init():
     assert sc.__init__.__name__ == "_cached_init"
     assert sc.__init_subclass__.__class__.__name__ == "DenyFurtherSubclassing"
     assert sc.loaded_from_cache is True
-    assert (t1 - t0) / 10**9 < 1
+    assert (t1 - t0) / 10 ** 9 < 1
 
 
 def test_cache_class_init_subclass():
