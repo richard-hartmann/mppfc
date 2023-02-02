@@ -10,7 +10,7 @@ import logging
 import sys
 
 sh = logging.StreamHandler(sys.stdout)
-sh.setLevel("DEBUG")
+sh.setLevel("WARNING")
 mppfc.cache.log.addHandler(sh)
 
 path_for_cache = pathlib.Path(".CacheInit/test.test_cache").absolute()
@@ -244,6 +244,48 @@ def test_manipulate_func_siganture():
     s3.bind(c=2)
 
 
+def test_cache_bounded_method():
+
+    with pytest.raises(TypeError):
+
+        class TestClass:
+            @mppfc.cache.CacheFileBasedDec()
+            def get(self, a):
+                return a * self.x
+
+
+class X:
+    class Z(mppfc.CacheInit):
+        def __init__(self, z):
+            self.z = z
+
+    def __init__(self, x, z):
+        self.x = x
+        self.myZ = X.Z(z)
+
+
+class XX:
+    class Y:
+        class Z(mppfc.CacheInit):
+            def __init__(self, z):
+                self.z = z
+
+
+def test_nested_classes():
+    shutil.rmtree(path_for_cache / "X.Z", ignore_errors=True)
+    shutil.rmtree(path_for_cache / "XX.Y.Z", ignore_errors=True)
+
+    z = X.Z(z=4)
+    assert str(z.path_for_cache).endswith("X.Z")
+    assert z.loaded_from_cache is False
+    z = X.Z(z=4)
+    assert z.loaded_from_cache is True
+
+    z2 = XX.Y.Z(z=4)
+    assert str(z2.path_for_cache).endswith("XX.Y.Z")
+    assert z2.loaded_from_cache is False
+
+
 if __name__ == "__main__":
     path_for_cache = pathlib.Path(".CacheInit/__main__/")
     non_default_path_for_cache = pathlib.Path(".myCache/__main__").absolute()
@@ -253,5 +295,7 @@ if __name__ == "__main__":
     # test_subclass_a_cached_class()
     # test_inheritance()
     # test_CacheInit_args()
-    sh.setLevel("ERROR")
-    test_manipulate_func_siganture()
+    # sh.setLevel("DEBUG")
+    # test_manipulate_func_siganture()
+    # test_cache_bounded_method()
+    test_nested_classes()

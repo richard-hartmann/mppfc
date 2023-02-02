@@ -8,6 +8,7 @@ import os
 import pathlib
 import pickle
 from typing import Any, Callable, Union
+from types import FunctionType
 
 # third party imports
 import binfootprint
@@ -21,7 +22,7 @@ log.setLevel("DEBUG")
 class CacheFileBased:
     def __init__(
         self,
-        fnc: Callable[..., Any],
+        fnc: FunctionType,
         path: Union[str, pathlib.Path] = ".cache",
         include_module_name: bool = True,
     ):
@@ -59,6 +60,13 @@ class CacheFileBased:
         """
         self.path = pathlib.Path(path).absolute()
         self.fnc = fnc
+
+        # note that a decorator receives the __func__ of a bounded method to
+        # inspect.isbounded cannot be used to identify a bounded method
+        if fnc.__name__ != fnc.__qualname__:
+            raise TypeError(
+                f"The function to cache must not be a bounded method, e.g. a class method, but is '{fnc.__qualname__}'"
+            )
         self.fnc_sig = signature(fnc)
         if include_module_name:
             self.cache_dir = self.path / (self.fnc.__module__ + "." + self.fnc.__name__)
@@ -283,7 +291,7 @@ class CacheFileBasedDec:
         self.path = path
         self.include_module_name = include_module_name
 
-    def __call__(self, fnc: Callable[..., Any]) -> CacheFileBased:
+    def __call__(self, fnc: FunctionType) -> CacheFileBased:
         """
         The returned CacheFileBased instance extends the function `fnc` by caching.
 
@@ -476,7 +484,7 @@ class CacheInit:
         cls.serializer = staticmethod(_CacheInit_serializer)
 
         cls.path_for_cache = _get_path_for_cache(
-            cls_name=cls.__name__,
+            cls_name=cls.__qualname__,
             mod_name=cls.__module__,
             path=_CacheInit_path,
             include_module_name=_CacheInit_include_module_name,
