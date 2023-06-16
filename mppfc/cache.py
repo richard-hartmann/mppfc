@@ -289,9 +289,7 @@ class CacheFileBased:
         item_exists = self.item_exists(f_name)
         if not item_exists:
             raise KeyError(
-                "Item not found in cache! (File '{}' does not exist.)".format(
-                    f_name
-                )
+                "Item not found in cache! (File '{}' does not exist.)".format(f_name)
             )
 
         with open(f_name, "rb") as f:
@@ -421,7 +419,10 @@ def _gen_hash_key(
 
 
 def _get_path_for_cache(
-    cls_name: str, mod_name: str, path: str, include_module_name: bool,
+    cls_name: str,
+    mod_name: str,
+    path: str,
+    include_module_name: bool,
 ) -> pathlib.Path:
     """
     construct the directory for dumping the object which is identified by its hash value
@@ -590,7 +591,8 @@ class CacheInit:
             f"saved {cls.__init__.__qualname__} to {cls.__qualname__}.init_of_subclass"
         )
         cls.sig_of_subclass = _remove_params_from_signature(
-            sig=signature(cls.__init__), params="self",
+            sig=signature(cls.__init__),
+            params="self",
         )
         log.debug(f"saved signature of cls: {cls.sig_of_subclass}")
         # overwrite the init of the subclass cls by cached_init
