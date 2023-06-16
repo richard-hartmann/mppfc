@@ -409,6 +409,23 @@ def test_join():
     assert c == 4
 
 
+def test_timing():
+    """
+    test saving the calculation time
+    """
+    p = Point(4, -2)
+    r = fnc(p)
+    t = fnc.get_calculation_time(p)
+    assert isinstance(t, float)
+
+    try:
+        t = fnc.get_calculation_time(p, b=700)
+    except KeyError:
+        pass
+    else:
+        assert False
+
+
 if __name__ == "__main__":
     # test_parse_num_proc()
     # test_hash_bytes_to_3_hex()
@@ -416,5 +433,6 @@ if __name__ == "__main__":
     # test_average_time_per_function_call()
     # test_mppfc_stop()
     # test_function_with_error()
-    test_join()
+    # test_join()
+    test_timing()
     pass

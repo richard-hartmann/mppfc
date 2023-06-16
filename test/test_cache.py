@@ -286,6 +286,7 @@ def test_nested_classes():
     assert z2.loaded_from_cache is False
 
 
+
 if __name__ == "__main__":
     path_for_cache = pathlib.Path(".CacheInit/__main__/")
     non_default_path_for_cache = pathlib.Path(".myCache/__main__").absolute()

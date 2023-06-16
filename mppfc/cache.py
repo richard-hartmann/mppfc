@@ -1,12 +1,13 @@
 # python imports
-from functools import partial
 import hashlib
 import inspect
+import warnings
 from inspect import signature
 import logging
 import os
 import pathlib
 import pickle
+from time import perf_counter_ns
 from typing import Any, Callable, Union
 from types import FunctionType
 
@@ -179,20 +180,25 @@ class CacheFileBased:
             return False
 
     @staticmethod
-    def _write_item(f_name: pathlib.Path, item: Any) -> None:
+    def _write_item(f_name: pathlib.Path, item: Any, delta_t: float = None) -> None:
         """
         writes item to disk at location f_name
+
+        Optionally write also the time it took to do the calculation.
 
         Removes partially written file on InterruptError.
 
         Args:
             f_name: Path object, where to dump the item
             item: the python object to be dumped
+            delta_t: time it took to do the calculation
         """
         f_name.parent.mkdir(parents=True, exist_ok=True)
         try:
             with open(f_name, "wb") as f:
                 pickle.dump(item, f)
+                if delta_t is not None:
+                    pickle.dump(delta_t, f)
         except Exception:
             os.remove(f_name)
             raise
@@ -231,8 +237,10 @@ class CacheFileBased:
                 with open(f_name, "rb") as f:
                     return pickle.load(f)
             elif (not item_exists) or (_cache_flag == "update"):
+                t_0 = perf_counter_ns()
                 r = self.fnc(*args, **kwargs)
-                self._write_item(f_name=f_name, item=r)
+                delta_t_in_sec = (perf_counter_ns() - t_0) / 10**9
+                self._write_item(f_name=f_name, item=r, delta_t=delta_t_in_sec)
                 return r
             else:
                 with open(f_name, "rb") as f:
@@ -263,6 +271,28 @@ class CacheFileBased:
             )
         f_name.parent.mkdir(parents=True, exist_ok=True)
         self._write_item(f_name=f_name, item=_cache_result)
+
+    def get_calculation_time(self, *args: Any, **kwargs: Any) -> [float, None]:
+        """
+        return the time it took to do the calculation
+
+        If no data is available return None
+        """
+        f_name = self.get_f_name(*args, **kwargs)
+        item_exists = self.item_exists(f_name)
+        if not item_exists:
+            raise KeyError(
+                "Item not found in cache! (File '{}' does not exist.)".format(
+                    f_name
+                )
+            )
+
+        with open(f_name, "rb") as f:
+            pickle.load(f)
+            try:
+                return pickle.load(f)
+            except EOFError:
+                warnings.warn("no information for the calculation time stored!")
 
 
 class CacheFileBasedDec:
